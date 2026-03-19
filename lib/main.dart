@@ -7,33 +7,21 @@ import 'services/offline_map_service.dart';
 import 'widgets/permission_gate.dart';
 import 'screens/map_screen.dart';
 
-// ═══════════════════════════════════════════════════════
-// PUNTO DE ENTRADA
-// Orden de inicialización es CRÍTICO:
-//  1. WidgetsFlutterBinding
-//  2. OfflineMapService  (necesita filesystem listo)
-//  3. ConnectivityService
-//  4. BackgroundGpsService
-//  5. runApp
-// ═══════════════════════════════════════════════════════
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
-  // Orientación libre (portrait en config, landscape en moto)
   await SystemChrome.setPreferredOrientations([
     DeviceOrientation.portraitUp,
     DeviceOrientation.landscapeLeft,
     DeviceOrientation.landscapeRight,
   ]);
 
-  // Forzar tema oscuro a nivel de sistema (barra de estado)
   SystemChrome.setSystemUIOverlayStyle(const SystemUiOverlayStyle(
     statusBarColor: Colors.transparent,
     statusBarBrightness: Brightness.dark,
     statusBarIconBrightness: Brightness.light,
   ));
 
-  // Inicializar servicios en orden
   await OfflineMapService.initialize();
   await ConnectivityService.initialize();
   await BackgroundGpsService.initialize();
@@ -41,9 +29,6 @@ void main() async {
   runApp(const MotoGpsApp());
 }
 
-// ═══════════════════════════════════════════════════════
-// APP RAÍZ
-// ═══════════════════════════════════════════════════════
 class MotoGpsApp extends StatelessWidget {
   const MotoGpsApp({super.key});
 
@@ -53,7 +38,6 @@ class MotoGpsApp extends StatelessWidget {
       title: 'MotoGPS',
       debugShowCheckedModeBanner: false,
       theme: _buildTheme(),
-      // PermissionGate bloquea la app hasta tener todos los permisos
       home: const PermissionGate(
         child: MapScreen(),
       ),
@@ -68,18 +52,6 @@ class MotoGpsApp extends StatelessWidget {
         primary: Colors.orange,
         secondary: Colors.orangeAccent,
         surface: Color(0xFF1A1A1A),
-        surface: Color(0xFF0D0D0D),
-```
-
----
-
-### Paso 5 — Commit y Push en GitHub Desktop
-
-Cuando guardes los 3 archivos, GitHub Desktop los detecta automáticamente:
-
-- **Summary:**
-```
-fix: corregir API deprecadas de FMTC y Geolocator
       ),
       scaffoldBackgroundColor: const Color(0xFF0D0D0D),
       appBarTheme: const AppBarTheme(
@@ -97,10 +69,6 @@ fix: corregir API deprecadas de FMTC y Geolocator
           ),
         ),
       ),
-      textTheme: const TextTheme(
-        bodyMedium: TextStyle(color: Colors.white),
-        bodySmall: TextStyle(color: Colors.white70),
-      ),
       snackBarTheme: const SnackBarThemeData(
         behavior: SnackBarBehavior.floating,
         shape: RoundedRectangleBorder(
@@ -110,3 +78,6 @@ fix: corregir API deprecadas de FMTC y Geolocator
     );
   }
 }
+```
+
+---
