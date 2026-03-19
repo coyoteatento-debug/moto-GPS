@@ -40,13 +40,13 @@ class OfflineMapService {
       'https://tile.openstreetmap.org/{z}/{x}/{y}.png';
 
   static Future<void> initialize() async {
-    await FMTCObjectBoxBackend().initialise();
-    await FMTCStore(_defaultStore).manage.create();
+    await FlutterMapTileCaching.initialise();
+    await FMTC.instance(_defaultStore).manage.createAsync();
   }
 
   static TileProvider getTileProvider({String? storeName}) {
-    return FMTCStore(storeName ?? _defaultStore).getTileProvider(
-      settings: FMTCTileProviderSettings(
+    return FMTC.instance(storeName ?? _defaultStore).getTileProvider(
+      FMTCTileProviderSettings(
         behavior: CacheBehavior.cacheFirst,
         cachedValidDuration: const Duration(days: 30),
       ),
@@ -58,20 +58,17 @@ class OfflineMapService {
     required LatLngBounds bounds,
     int minZoom = 8,
     int maxZoom = 16,
-    String urlTemplate = _osmUrl,
   }) async* {
-    final store = FMTCStore(storeName);
-    await store.manage.create();
+    await FMTC.instance(storeName).manage.createAsync();
 
     final region = RectangleRegion(bounds);
     final downloadable = region.toDownloadable(
-      minZoom: minZoom,
-      maxZoom: maxZoom,
-      options: TileLayer(urlTemplate: urlTemplate),
+      minZoom,
+      maxZoom,
+      TileLayer(urlTemplate: _osmUrl),
     );
 
-    // FMTC v9: usa count en lugar de approxTiles
-    final tileCount = downloadable.count;
+    final tileCount = downloadable.numberOfTiles;
     final estimatedMB = (tileCount * 25) / 1024;
 
     yield DownloadProgress(
@@ -85,23 +82,20 @@ class OfflineMapService {
     int completed = 0;
 
     try {
-      await for (final event in store.download.startForeground(
+      await for (final event in FMTC.instance(storeName).download.startForeground(
         region: downloadable,
         parallelThreads: 3,
         maxBufferLength: 100,
         skipExistingTiles: true,
-        retryFailedRequestTiles: true,
       )) {
-        if (event is TileEvent && event.result.category.isPositive) {
-          completed++;
-          yield DownloadProgress(
-            tilesCompleted: completed,
-            tilesTotal: tileCount,
-            percentage: tileCount > 0 ? (completed / tileCount) * 100 : 100,
-            estimatedMB: estimatedMB,
-            status: DownloadStatus.downloading,
-          );
-        }
+        completed++;
+        yield DownloadProgress(
+          tilesCompleted: completed,
+          tilesTotal: tileCount,
+          percentage: tileCount > 0 ? (completed / tileCount) * 100 : 100,
+          estimatedMB: estimatedMB,
+          status: DownloadStatus.downloading,
+        );
       }
 
       yield DownloadProgress(
@@ -115,7 +109,7 @@ class OfflineMapService {
       yield DownloadProgress(
         tilesCompleted: completed,
         tilesTotal: tileCount,
-        percentage: tileCount > 0 ? (completed / tileCount) * 100 : 0,
+        percentage: 0,
         estimatedMB: estimatedMB,
         status: DownloadStatus.failed,
         error: e.toString(),
@@ -124,12 +118,12 @@ class OfflineMapService {
   }
 
   static Future<List<StoreInfo>> listStores() async {
-    final storeNames = await FMTCRoot.stats.storesAvailable;
+    final stores = await FMTC.instance('').rootDirectory.stats.storesAvailableAsync;
     final List<StoreInfo> result = [];
-    for (final name in storeNames) {
-      final store = FMTCStore(name);
-      final tiles = await store.stats.length;
-      final sizeKib = await store.stats.size;
+    for (final name in stores) {
+      final stats = FMTC.instance(name).stats;
+      final tiles = await stats.storeLengthAsync;
+      final sizeKib = await stats.storeSizeAsync;
       result.add(StoreInfo(
         name: name,
         tiles: tiles,
@@ -140,15 +134,15 @@ class OfflineMapService {
   }
 
   static Future<void> deleteStore(String name) async {
-    await FMTCStore(name).manage.delete();
+    await FMTC.instance(name).manage.deleteAsync();
   }
 
   static Future<double> totalSizeMB() async {
-    final sizeKib = await FMTCRoot.stats.size;
+    final sizeKib = await FMTC.instance('').rootDirectory.stats.rootSizeAsync;
     return sizeKib / 1024;
   }
 
   static Future<void> cancelDownload(String storeName) async {
-    await FMTCStore(storeName).download.cancel();
+    await FMTC.instance(storeName).download.cancel();
   }
 }
