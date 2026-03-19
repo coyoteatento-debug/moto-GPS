@@ -64,3 +64,4 @@ class MotoGpsApp extends StatelessWidget {
       ),
     );
   }
+}
