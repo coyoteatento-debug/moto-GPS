@@ -68,7 +68,18 @@ class MotoGpsApp extends StatelessWidget {
         primary: Colors.orange,
         secondary: Colors.orangeAccent,
         surface: Color(0xFF1A1A1A),
-        background: Color(0xFF0D0D0D),
+        surface: Color(0xFF0D0D0D),
+```
+
+---
+
+### Paso 5 — Commit y Push en GitHub Desktop
+
+Cuando guardes los 3 archivos, GitHub Desktop los detecta automáticamente:
+
+- **Summary:**
+```
+fix: corregir API deprecadas de FMTC y Geolocator
       ),
       scaffoldBackgroundColor: const Color(0xFF0D0D0D),
       appBarTheme: const AppBarTheme(
