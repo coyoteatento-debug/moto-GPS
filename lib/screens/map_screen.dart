@@ -354,9 +354,7 @@ class _MapScreenState extends State<MapScreen>
 
         // Tile layer con caché offline automático
         TileLayer(
-          urlTemplate: _isNightMode
-              ? _MapStyles.night
-              : _MapStyles.standard,
+         urlTemplate: _currentMapStyle, // Donde _currentMapStyle es una variable que rotas entre los 3.
           userAgentPackageName: 'com.tuempresa.motogps',
           // FMTCTileProvider sirve desde caché local si no hay internet
           tileProvider: OfflineMapService.getTileProvider(),
