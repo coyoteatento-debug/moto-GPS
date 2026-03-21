@@ -42,7 +42,7 @@ class _MotoGPSAppState extends State<MotoGPSApp> {
               position.longitude,
               position.latitude,
             ),
-          ).toJson(),
+          ),
           zoom: _calculateDynamicZoom(_currentSpeed),
         ));
       }
