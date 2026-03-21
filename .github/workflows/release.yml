@@ -21,13 +21,13 @@ jobs:
       - name: Setup Flutter
         uses: subosito/flutter-action@v2
         with:
+          flutter-version: '3.29.2'  # ✅ Versión estable sin el bug
           channel: 'stable'
           cache: true
 
       - name: Flutter version
         run: flutter --version
 
-      # ✅ CRÍTICO: Escribir el token de Mapbox donde Gradle lo espera
       - name: Configure Mapbox token
         run: |
           mkdir -p ~/.gradle
