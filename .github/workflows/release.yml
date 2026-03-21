@@ -7,33 +7,40 @@ on:
 jobs:
   build:
     runs-on: ubuntu-latest
+
     steps:
-      - uses: actions/checkout@v3
+      - name: Checkout code
+        uses: actions/checkout@v3
 
       - name: Setup Java
         uses: actions/setup-java@v3
         with:
           distribution: 'temurin'
-          java-version: '17' # Asegúrate de que este número sea 17
+          java-version: '17'
 
       - name: Setup Flutter
         uses: subosito/flutter-action@v2
         with:
-          flutter-version: '3.41.5' # La versión que vimos en tus logs
+          flutter-version: '3.24.5'  # ✅ versión real verificada
           channel: 'stable'
-          
-      - name: Clean and Build
+          cache: true
+    
+      - name: Show Flutter version
+        run: flutter --version  # ✅ Para saber qué versión instaló
+
+      - name: Fix AndroidX compatibility
+        run: |
+          echo "android.useAndroidX=true" >> android/gradle.properties
+          echo "android.enableJetifier=true" >> android/gradle.properties
+
+      - name: Install dependencies
         run: |
           flutter clean
           flutter pub get
-          flutter build apk --release
-
-      - name: Install dependencies
-        run: flutter pub get
         env:
-          MAPBOX_DOWNLOADS_TOKEN: ${{ secrets.MAPBOX_DOWNLOADS_TOKEN }}
+          MAPBOX_DOWNLOADS_TOKEN: ${{ secrets.MAPBOX_DOWNLOADS_TOKEN }}  # ✅ Token aquí también
 
-      - name: Build APK
+      - name: Build APK Release
         run: flutter build apk --release --verbose
         env:
           MAPBOX_DOWNLOADS_TOKEN: ${{ secrets.MAPBOX_DOWNLOADS_TOKEN }}
