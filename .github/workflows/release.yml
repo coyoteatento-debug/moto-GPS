@@ -41,7 +41,8 @@ jobs:
           MAPBOX_DOWNLOADS_TOKEN: ${{ secrets.MAPBOX_DOWNLOADS_TOKEN }}  # ✅ Token aquí también
 
       - name: Build APK Release
-        run: flutter build apk --release --verbose
+        run: |
+          flutter build apk --release 2>&1 | head -n 100
         env:
           MAPBOX_DOWNLOADS_TOKEN: ${{ secrets.MAPBOX_DOWNLOADS_TOKEN }}
 
