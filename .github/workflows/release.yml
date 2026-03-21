@@ -33,6 +33,7 @@ jobs:
           mkdir -p ~/.gradle
           echo "MAPBOX_DOWNLOADS_TOKEN=${{ secrets.MAPBOX_DOWNLOADS_TOKEN }}" >> ~/.gradle/gradle.properties
           echo "sdk.dir=$ANDROID_HOME" >> android/local.properties
+          echo "flutter.sdk=$(which flutter | sed 's|/bin/flutter||')" >> android/local.properties
 
       - name: Fix AndroidX
         run: |
