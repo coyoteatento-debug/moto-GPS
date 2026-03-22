@@ -4,9 +4,8 @@ import 'package:geolocator/geolocator.dart';
 import 'package:permission_handler/permission_handler.dart';
 
 void main() {
-  // ✅ Token de Mapbox para mostrar el mapa
   mapbox.MapboxOptions.setAccessToken(
-    "pk.eyJ1IjoiY295b3RlYXRlbnRvMjIiLCJhIjoiY21tejd3MjNvMDViOTJycTRhajIyejM4MCJ9.eevGvjW-uA4r3VtYWRliaQ"
+    "pk.eyJ1IjoiY295b3RlYXRlbnRvLWRlYnVnIiwiYSI6ImNtOGg2aWNndzBiNXMyaXB1NWlzYnFsb3gifQ.eevGvjW-uA4r3VtYWRliaQ"
   );
   runApp(const MaterialApp(home: MotoGPSApp()));
 }
@@ -24,10 +23,9 @@ class _MotoGPSAppState extends State<MotoGPSApp> {
   @override
   void initState() {
     super.initState();
-    _requestPermissions();  // ✅ Pedir permisos al iniciar
+    _requestPermissions();
   }
 
-  // ✅ Solicitar permisos de ubicación
   Future<void> _requestPermissions() async {
     final status = await Permission.locationWhenInUse.request();
     if (status.isGranted) {
@@ -80,11 +78,10 @@ class _MotoGPSAppState extends State<MotoGPSApp> {
             key: const ValueKey("mapWidget"),
             onMapCreated: _onMapCreated,
             styleUri: mapbox.MapboxStyles.STANDARD,
-            cameraOptions: mapbox.CameraOptions(  // ✅ Posición inicial
-    zoom: 15.0,
-    pitch: 0.0,
-  ),
-),
+            cameraOptions: mapbox.CameraOptions(
+              zoom: 15.0,
+              pitch: 0.0,
+            ),
           ),
           Positioned(
             bottom: 30,
@@ -105,8 +102,10 @@ class _MotoGPSAppState extends State<MotoGPSApp> {
                       fontWeight: FontWeight.bold,
                     ),
                   ),
-                  const Text("km/h",
-                      style: TextStyle(color: Colors.white70)),
+                  const Text(
+                    "km/h",
+                    style: TextStyle(color: Colors.white70),
+                  ),
                 ],
               ),
             ),
