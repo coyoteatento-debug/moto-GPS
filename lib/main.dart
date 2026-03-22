@@ -80,6 +80,11 @@ class _MotoGPSAppState extends State<MotoGPSApp> {
             key: const ValueKey("mapWidget"),
             onMapCreated: _onMapCreated,
             styleUri: mapbox.MapboxStyles.STANDARD,
+            cameraOptions: mapbox.CameraOptions(  // ✅ Posición inicial
+    zoom: 15.0,
+    pitch: 0.0,
+  ),
+),
           ),
           Positioned(
             bottom: 30,
