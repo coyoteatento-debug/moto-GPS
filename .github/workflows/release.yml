@@ -55,6 +55,10 @@ jobs:
 
       - name: Build APK Release
         run: flutter build apk --release
+        env:
+          MAPBOX_DOWNLOADS_TOKEN: ${{ secrets.MAPBOX_DOWNLOADS_TOKEN }}
+          GRADLE_OPTS: "-Xmx4g -XX:MaxMetaspaceSize=512m"
+          JAVA_TOOL_OPTIONS: "-Xmx4g"
 
       - name: Upload Artifact
         uses: actions/upload-artifact@v4
