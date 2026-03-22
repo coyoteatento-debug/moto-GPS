@@ -79,6 +79,7 @@ class _MotoGPSAppState extends State<MotoGPSApp> {
           mapbox.MapWidget(
             key: const ValueKey("mapWidget"),
             onMapCreated: _onMapCreated,
+            styleUri: mapbox.MapboxStyles.STANDARD,
           ),
           Positioned(
             bottom: 30,
