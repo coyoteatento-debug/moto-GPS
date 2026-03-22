@@ -3,7 +3,8 @@ import 'package:mapbox_maps_flutter/mapbox_maps_flutter.dart' as mapbox;
 import 'package:geolocator/geolocator.dart';
 import 'package:permission_handler/permission_handler.dart';
 
-void main() {
+void main() async {
+  WidgetsFlutterBinding.ensureInitialized(); // ✅ Fix 1
   mapbox.MapboxOptions.setAccessToken(
     "pk.eyJ1IjoiY295b3RlYXRlbnRvMjIiLCJhIjoiY21tejd3MjNvMDViOTJycTRhajIyejM4MCJ9.eevGvjW-uA4r3VtYWRliaQ"
   );
@@ -74,13 +75,16 @@ class _MotoGPSAppState extends State<MotoGPSApp> {
     return Scaffold(
       body: Stack(
         children: [
-          mapbox.MapWidget(
-            key: const ValueKey("mapWidget"),
-            onMapCreated: _onMapCreated,
-            styleUri: mapbox.MapboxStyles.STANDARD,
-            cameraOptions: mapbox.CameraOptions(
-              zoom: 15.0,
-              pitch: 0.0,
+          // ✅ Fix 2 — SizedBox.expand fuerza tamaño completo
+          SizedBox.expand(
+            child: mapbox.MapWidget(
+              key: const ValueKey("mapWidget"),
+              onMapCreated: _onMapCreated,
+              styleUri: mapbox.MapboxStyles.STANDARD,
+              cameraOptions: mapbox.CameraOptions(
+                zoom: 15.0,
+                pitch: 0.0,
+              ),
             ),
           ),
           Positioned(
