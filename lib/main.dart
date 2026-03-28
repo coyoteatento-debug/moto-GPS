@@ -880,31 +880,79 @@ out center;
 
   // ── Búsqueda ──────────────────────────────────────────
   Future<void> _searchPlaces(String query) async {
-    if (query.isEmpty) {
-      setState(() => _searchResults = []);
-      return;
-    }
-    final url = Uri.parse(
+  if (query.isEmpty) {
+    setState(() => _searchResults = []);
+    return;
+  }
+
+  // ✅ Construir URL con sesgo de proximidad a tu posición actual
+  String url;
+
+  if (_currentPosition != null) {
+    final lat = _currentPosition!.latitude;
+    final lng = _currentPosition!.longitude;
+
+    // ✅ proximity  → prioriza resultados cerca de ti
+    // ✅ bbox       → limita resultados a ~50km alrededor
+    final double offset = 0.45; // ~50km en grados
+    final double minLng = lng - offset;
+    final double minLat = lat - offset;
+    final double maxLng = lng + offset;
+    final double maxLat = lat + offset;
+
+    url =
       'https://api.mapbox.com/geocoding/v5/mapbox.places/'
       '${Uri.encodeComponent(query)}.json'
-      '?access_token=$_mapboxToken&language=es&limit=5',
-    );
-    final response = await http.get(url);
+      '?access_token=$_mapboxToken'
+      '&language=es'
+      '&limit=6'
+      '&proximity=$lng,$lat'           // ✅ ordena por cercanía
+      '&bbox=$minLng,$minLat,$maxLng,$maxLat'; // ✅ limita área
+  } else {
+    // Sin posición aún — búsqueda normal
+    url =
+      'https://api.mapbox.com/geocoding/v5/mapbox.places/'
+      '${Uri.encodeComponent(query)}.json'
+      '?access_token=$_mapboxToken'
+      '&language=es'
+      '&limit=6';
+  }
+
+  try {
+    final response = await http.get(Uri.parse(url));
     if (response.statusCode == 200) {
       final data     = json.decode(response.body);
       final features = data['features'] as List;
+
       setState(() {
-        _searchResults = features
-            .map((f) => {
-                  'name': f['place_name'] as String,
-                  'lng':  f['center'][0] as double,
-                  'lat':  f['center'][1] as double,
-                })
-            .toList();
+        _searchResults = features.map((f) {
+          // ✅ Calcular distancia para mostrarla en el resultado
+          final resLng = f['center'][0] as double;
+          final resLat = f['center'][1] as double;
+          double? distKm;
+
+          if (_currentPosition != null) {
+            final distM = _distanceBetween(
+              _currentPosition!.latitude,
+              _currentPosition!.longitude,
+              resLat,
+              resLng,
+            );
+            distKm = distM / 1000;
+          }
+
+          return {
+            'name':    f['place_name'] as String,
+            'short':   f['text'] as String,         // ✅ nombre corto
+            'lng':     resLng,
+            'lat':     resLat,
+            'distKm':  distKm,
+          };
+        }).toList();
       });
     }
-  }
-
+  } catch (_) {}
+}
   // ── Ruta ──────────────────────────────────────────────
   Future<void> _getRoute(double destLat, double destLng) async {
     if (_currentPosition == null) return;
@@ -1333,39 +1381,68 @@ out center;
                         separatorBuilder: (_, __) =>
                             const Divider(height: 1),
                         itemBuilder: (context, index) {
-                          final place = _searchResults[index];
-                          return ListTile(
-                            leading: const Icon(Icons.location_on,
-                                color: Colors.blue),
-                            title: Text(place['name'],
-                                style:
-                                    const TextStyle(fontSize: 13),
-                                maxLines: 2,
-                                overflow: TextOverflow.ellipsis),
-                            trailing: IconButton(
-                              icon: const Icon(
-                                  Icons.bookmark_add_outlined,
-                                  color: Colors.orange),
-                              onPressed: () => _addPlaceToList(
-                                PlaceItem(
-                                  name: place['name'],
-                                  lat:  place['lat'],
-                                  lng:  place['lng'],
-                                ),
-                              ),
-                            ),
-                            onTap: () => _goToPlace(
-                                place['lat'],
-                                place['lng'],
-                                place['name']),
-                          );
-                        },
-                      ),
-                    ),
-                ],
-              ),
-            ),
+  final place   = _searchResults[index];
+  final distKm  = place['distKm'] as double?;
+  final distText = distKm != null
+      ? distKm < 1
+          ? '${(distKm * 1000).toStringAsFixed(0)} m'
+          : '${distKm.toStringAsFixed(1)} km'
+      : '';
 
+  return ListTile(
+    leading: const Icon(Icons.location_on, color: Colors.blue),
+    title: Text(
+      place['short'],                        // ✅ nombre corto
+      style: const TextStyle(
+          fontSize: 13, fontWeight: FontWeight.w600),
+      maxLines: 1,
+      overflow: TextOverflow.ellipsis,
+    ),
+    subtitle: Text(
+      place['name'],                         // ✅ dirección completa
+      style: const TextStyle(fontSize: 11, color: Colors.grey),
+      maxLines: 1,
+      overflow: TextOverflow.ellipsis,
+    ),
+    trailing: Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        // ✅ Distancia
+        if (distText.isNotEmpty)
+          Container(
+            margin: const EdgeInsets.only(right: 4),
+            padding: const EdgeInsets.symmetric(
+                horizontal: 6, vertical: 3),
+            decoration: BoxDecoration(
+              color: Colors.blue[50],
+              borderRadius: BorderRadius.circular(8),
+            ),
+            child: Text(
+              distText,
+              style: TextStyle(
+                  fontSize: 10,
+                  color: Colors.blue[700],
+                  fontWeight: FontWeight.w600),
+            ),
+          ),
+        // ✅ Guardar en lista
+        IconButton(
+          icon: const Icon(Icons.bookmark_add_outlined,
+              color: Colors.orange),
+          onPressed: () => _addPlaceToList(
+            PlaceItem(
+              name: place['name'],
+              lat:  place['lat'],
+              lng:  place['lng'],
+            ),
+          ),
+        ),
+      ],
+    ),
+    onTap: () => _goToPlace(
+        place['lat'], place['lng'], place['name']),
+  );
+},
           // ── Confirmar tap ────────────────────────────
           if (_showTapConfirm && !_navigating)
             Positioned(
