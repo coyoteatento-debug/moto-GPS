@@ -423,12 +423,6 @@ class _MotoGPSAppState extends State<MotoGPSApp> {
     annotationManager =
         await map.annotations.createPointAnnotationManager();
 
-    // ✅ Recargar POIs cada vez que la cámara termina de moverse
-    map.setOnCameraChangeListener((state) async {
-      if (_poisVisible && !_poiLoading) {
-        await _detectAndLoadCityPOIs();
-      }
-    });
   }
 
   // ── POIs — detectar ciudad y cargar ───────────────────
@@ -1177,6 +1171,13 @@ out center;
               onTapListener: _onMapTap,
               cameraOptions:
                   mapbox.CameraOptions(zoom: 15.0, pitch: 0.0),
+
+              // ✅ AGREGA ESTO — listener correcto para v2.20.0
+              onCameraChangeListener: (state) async {
+                if (_poisVisible && !_poiLoading) {
+                  await _detectAndLoadCityPOIs();
+                }
+              },      
             ),
           ),
 
