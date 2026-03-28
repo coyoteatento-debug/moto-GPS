@@ -437,9 +437,18 @@ class _MotoGPSAppState extends State<MotoGPSApp> {
     if (_poiLoading) return;
 
     try {
-      final bounds = await mapboxMap!.coordinateBoundsForCamera(
-        await mapboxMap!.getCameraState(),
-      );
+    // ✅ FIX — getCameraState() devuelve CameraState, hay que
+    // convertirlo a CameraOptions antes de pasarlo a coordinateBoundsForCamera
+    final cameraState = await mapboxMap!.getCameraState();
+
+    final bounds = await mapboxMap!.coordinateBoundsForCamera(
+      mapbox.CameraOptions(
+        center:  cameraState.center,     // ✅ Point
+        zoom:    cameraState.zoom,       // ✅ double
+        bearing: cameraState.bearing,    // ✅ double
+        pitch:   cameraState.pitch,      // ✅ double
+      ),
+    );
 
       // Evitar refetch si los bounds no cambiaron
       if (_lastFetchedBounds != null &&
