@@ -21,47 +21,29 @@ void main() async {
   runApp(const MaterialApp(home: MotoGPSApp()));
 }
 
-// ── Modelo de lugar ───────────────────────────────────────
 class PlaceItem {
   final String name;
   final double lat;
   final double lng;
-
   PlaceItem({required this.name, required this.lat, required this.lng});
-
   Map<String, dynamic> toJson() => {'name': name, 'lat': lat, 'lng': lng};
   factory PlaceItem.fromJson(Map<String, dynamic> j) =>
       PlaceItem(name: j['name'], lat: j['lat'], lng: j['lng']);
 }
 
-// ── Modelo de lista ───────────────────────────────────────
 class PlaceList {
   String id;
   String name;
   String emoji;
   List<PlaceItem> places;
-
-  PlaceList({
-    required this.id,
-    required this.name,
-    required this.emoji,
-    required this.places,
-  });
-
+  PlaceList({required this.id, required this.name, required this.emoji, required this.places});
   Map<String, dynamic> toJson() => {
-        'id': id,
-        'name': name,
-        'emoji': emoji,
+        'id': id, 'name': name, 'emoji': emoji,
         'places': places.map((p) => p.toJson()).toList(),
       };
-
   factory PlaceList.fromJson(Map<String, dynamic> j) => PlaceList(
-        id: j['id'],
-        name: j['name'],
-        emoji: j['emoji'] ?? '📍',
-        places: (j['places'] as List)
-            .map((p) => PlaceItem.fromJson(p))
-            .toList(),
+        id: j['id'], name: j['name'], emoji: j['emoji'] ?? '📍',
+        places: (j['places'] as List).map((p) => PlaceItem.fromJson(p)).toList(),
       );
 }
 
@@ -73,17 +55,14 @@ class MotoGPSApp extends StatefulWidget {
 
 class _MotoGPSAppState extends State<MotoGPSApp> {
 
-  // ── Mapa ──────────────────────────────────────────────
   mapbox.MapboxMap? mapboxMap;
   mapbox.PointAnnotationManager? annotationManager;
   mapbox.PointAnnotation? motoAnnotation;
   mapbox.PointAnnotation? destinationAnnotation;
 
-  // ── Imágenes cacheadas ────────────────────────────────
   Uint8List? pinImage;
   Uint8List? motoImage;
 
-  // ── Estado general ────────────────────────────────────
   double _currentSpeed = 0.0;
   Position? _currentPosition;
 
@@ -101,57 +80,23 @@ class _MotoGPSAppState extends State<MotoGPSApp> {
   double? _tappedLng;
 
   List<List<double>> _routeCoordinates = [];
-
-  // ── Listas de lugares ─────────────────────────────────
   List<PlaceList> _placeLists = [];
   final GlobalKey<ScaffoldState> _scaffoldKey = GlobalKey<ScaffoldState>();
 
-  // ── POIs ──────────────────────────────────────────────
   bool _poisVisible = true;
   bool _poiLoading  = false;
   String _currentCity = '';
   mapbox.CoordinateBounds? _lastFetchedBounds;
 
   static const List<Map<String, String>> _poiCategories = [
-    {
-      'id':    'fuel',
-      'query': 'amenity=fuel',
-      'icon':  'fuel',
-      'label': 'Gasolineras',
-    },
-    {
-      'id':    'restaurant',
-      'query': 'amenity=restaurant',
-      'icon':  'restaurant',
-      'label': 'Restaurantes',
-    },
-    {
-      'id':    'hotel',
-      'query': 'tourism=hotel',
-      'icon':  'lodging',
-      'label': 'Hoteles',
-    },
-    {
-      'id':    'mall',
-      'query': 'shop=mall',
-      'icon':  'shop',
-      'label': 'Centros comerciales',
-    },
-    {
-      'id':    'marketplace',
-      'query': 'amenity=marketplace',
-      'icon':  'shop',
-      'label': 'Plazas comerciales',
-    },
-    {
-      'id':    'hospital',
-      'query': 'amenity=hospital',
-      'icon':  'hospital',
-      'label': 'Hospitales',
-    },
+    {'id': 'fuel',        'query': 'amenity=fuel',        'icon': 'fuel',       'label': 'Gasolineras'},
+    {'id': 'restaurant',  'query': 'amenity=restaurant',  'icon': 'restaurant', 'label': 'Restaurantes'},
+    {'id': 'hotel',       'query': 'tourism=hotel',       'icon': 'lodging',    'label': 'Hoteles'},
+    {'id': 'mall',        'query': 'shop=mall',           'icon': 'shop',       'label': 'Centros comerciales'},
+    {'id': 'marketplace', 'query': 'amenity=marketplace', 'icon': 'shop',       'label': 'Plazas comerciales'},
+    {'id': 'hospital',    'query': 'amenity=hospital',    'icon': 'hospital',   'label': 'Hospitales'},
   ];
 
-  // ─────────────────────────────────────────────────────
   @override
   void initState() {
     super.initState();
@@ -166,64 +111,42 @@ class _MotoGPSAppState extends State<MotoGPSApp> {
     super.dispose();
   }
 
-  // ── Redimensiona imagen ───────────────────────────────
+  // ── Imágenes ──────────────────────────────────────────
   Future<Uint8List> _resizeImage(Uint8List data, int targetWidth) async {
-    final codec = await ui.instantiateImageCodec(
-      data,
-      targetWidth: targetWidth,
-    );
+    final codec    = await ui.instantiateImageCodec(data, targetWidth: targetWidth);
     final frame    = await codec.getNextFrame();
-    final byteData = await frame.image.toByteData(
-      format: ui.ImageByteFormat.png,
-    );
+    final byteData = await frame.image.toByteData(format: ui.ImageByteFormat.png);
     return byteData!.buffer.asUint8List();
   }
 
-  // ── Carga imágenes una sola vez ───────────────────────
   Future<void> _loadImages() async {
     final ByteData pinData  = await rootBundle.load('assets/moto_pin.png');
     final ByteData motoData = await rootBundle.load('assets/moto.png');
-
-    final Uint8List pinResized  = await _resizeImage(
-      pinData.buffer.asUint8List(),
-      120,
-    );
-    final Uint8List motoResized = await _resizeImage(
-      motoData.buffer.asUint8List(),
-      100,
-    );
-
-    setState(() {
-      pinImage  = pinResized;
-      motoImage = motoResized;
-    });
+    final Uint8List pinResized  = await _resizeImage(pinData.buffer.asUint8List(), 120);
+    final Uint8List motoResized = await _resizeImage(motoData.buffer.asUint8List(), 100);
+    setState(() { pinImage = pinResized; motoImage = motoResized; });
   }
 
   // ── Listas ────────────────────────────────────────────
   Future<void> _loadLists() async {
     final prefs = await SharedPreferences.getInstance();
-    final raw = prefs.getString('place_lists');
+    final raw   = prefs.getString('place_lists');
     if (raw != null) {
       final data = json.decode(raw) as List;
-      setState(() {
-        _placeLists = data.map((e) => PlaceList.fromJson(e)).toList();
-      });
+      setState(() { _placeLists = data.map((e) => PlaceList.fromJson(e)).toList(); });
     }
   }
 
   Future<void> _saveLists() async {
     final prefs = await SharedPreferences.getInstance();
-    await prefs.setString(
-      'place_lists',
-      json.encode(_placeLists.map((l) => l.toJson()).toList()),
-    );
+    await prefs.setString('place_lists',
+        json.encode(_placeLists.map((l) => l.toJson()).toList()));
   }
 
   void _createList() {
     final nameController = TextEditingController();
     String selectedEmoji = '📍';
     final emojis = ['📍','⛽','🍽️','🏨','🏍️','🌄','🔧','🎯','⭐','🗺️'];
-
     showDialog(
       context: context,
       builder: (ctx) => StatefulBuilder(
@@ -235,9 +158,7 @@ class _MotoGPSAppState extends State<MotoGPSApp> {
               TextField(
                 controller: nameController,
                 decoration: const InputDecoration(
-                  labelText: 'Nombre de la lista',
-                  border: OutlineInputBorder(),
-                ),
+                    labelText: 'Nombre de la lista', border: OutlineInputBorder()),
               ),
               const SizedBox(height: 16),
               const Text('Elige un emoji:'),
@@ -249,15 +170,10 @@ class _MotoGPSAppState extends State<MotoGPSApp> {
                   child: Container(
                     padding: const EdgeInsets.all(6),
                     decoration: BoxDecoration(
-                      color: selectedEmoji == e
-                          ? Colors.blue[100]
-                          : Colors.transparent,
+                      color: selectedEmoji == e ? Colors.blue[100] : Colors.transparent,
                       borderRadius: BorderRadius.circular(8),
                       border: Border.all(
-                        color: selectedEmoji == e
-                            ? Colors.blue
-                            : Colors.transparent,
-                      ),
+                          color: selectedEmoji == e ? Colors.blue : Colors.transparent),
                     ),
                     child: Text(e, style: const TextStyle(fontSize: 22)),
                   ),
@@ -266,10 +182,7 @@ class _MotoGPSAppState extends State<MotoGPSApp> {
             ],
           ),
           actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(ctx),
-              child: const Text('Cancelar'),
-            ),
+            TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Cancelar')),
             ElevatedButton(
               onPressed: () {
                 if (nameController.text.trim().isEmpty) return;
@@ -294,15 +207,12 @@ class _MotoGPSAppState extends State<MotoGPSApp> {
 
   void _addPlaceToList(PlaceItem place) {
     if (_placeLists.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: const Text('Primero crea una lista'),
-          action: SnackBarAction(label: 'Crear', onPressed: _createList),
-        ),
-      );
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+        content: const Text('Primero crea una lista'),
+        action: SnackBarAction(label: 'Crear', onPressed: _createList),
+      ));
       return;
     }
-
     showDialog(
       context: context,
       builder: (ctx) => AlertDialog(
@@ -315,38 +225,29 @@ class _MotoGPSAppState extends State<MotoGPSApp> {
             itemBuilder: (_, i) {
               final list = _placeLists[i];
               return ListTile(
-                leading: Text(list.emoji,
-                    style: const TextStyle(fontSize: 24)),
+                leading: Text(list.emoji, style: const TextStyle(fontSize: 24)),
                 title: Text(list.name),
                 subtitle: Text('${list.places.length} lugares'),
                 onTap: () {
-                  final exists =
-                      list.places.any((p) => p.name == place.name);
+                  final exists = list.places.any((p) => p.name == place.name);
                   if (exists) {
                     Navigator.pop(ctx);
                     ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(
-                          content: Text('Este lugar ya está en la lista')),
-                    );
+                        const SnackBar(content: Text('Este lugar ya está en la lista')));
                     return;
                   }
                   setState(() => list.places.add(place));
                   _saveLists();
                   Navigator.pop(ctx);
                   ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(
-                        content: Text('✅ Agregado a "${list.name}"')),
-                  );
+                      SnackBar(content: Text('✅ Agregado a "${list.name}"')));
                 },
               );
             },
           ),
         ),
         actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx),
-            child: const Text('Cancelar'),
-          ),
+          TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Cancelar')),
         ],
       ),
     );
@@ -358,20 +259,10 @@ class _MotoGPSAppState extends State<MotoGPSApp> {
       MaterialPageRoute(
         builder: (_) => PlaceListScreen(
           placeList: list,
-          onNavigate: (place) {
-            Navigator.pop(context);
-            _goToPlace(place.lat, place.lng, place.name);
-          },
-          onDelete: (place) {
-            setState(() => list.places.remove(place));
-            _saveLists();
-          },
-          onShare: () => _shareList(list),
-          onDeleteList: () {
-            setState(() => _placeLists.remove(list));
-            _saveLists();
-            Navigator.pop(context);
-          },
+          onNavigate: (place) { Navigator.pop(context); _goToPlace(place.lat, place.lng, place.name); },
+          onDelete:   (place) { setState(() => list.places.remove(place)); _saveLists(); },
+          onShare:    () => _shareList(list),
+          onDeleteList: () { setState(() => _placeLists.remove(list)); _saveLists(); Navigator.pop(context); },
         ),
       ),
     );
@@ -382,21 +273,15 @@ class _MotoGPSAppState extends State<MotoGPSApp> {
     buffer.writeln('${list.emoji} ${list.name} — MotoGPS\n');
     for (final place in list.places) {
       buffer.writeln('📍 ${place.name}');
-      buffer.writeln(
-          'https://maps.google.com/?q=${place.lat},${place.lng}\n');
+      buffer.writeln('https://maps.google.com/?q=${place.lat},${place.lng}\n');
     }
-    final encoded = Uri.encodeComponent(buffer.toString());
-    final uri = Uri.parse('https://wa.me/?text=$encoded');
+    final uri = Uri.parse('https://wa.me/?text=${Uri.encodeComponent(buffer.toString())}');
     if (await canLaunchUrl(uri)) {
       await launchUrl(uri, mode: LaunchMode.externalApplication);
     } else {
       await Clipboard.setData(ClipboardData(text: buffer.toString()));
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-              content: Text('📋 Lista copiada al portapapeles')),
-        );
-      }
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('📋 Lista copiada al portapapeles')));
     }
   }
 
@@ -410,347 +295,224 @@ class _MotoGPSAppState extends State<MotoGPSApp> {
     }
   }
 
-  // ── Zoom dinámico ─────────────────────────────────────
   double _calculateDynamicZoom(double speed) {
     if (speed < 20) return 16.0;
     if (speed < 80) return 14.0;
     return 12.0;
   }
 
-  // ── Mapa listo ────────────────────────────────────────
+  // ── Mapa ──────────────────────────────────────────────
   Future<void> _onMapCreated(mapbox.MapboxMap map) async {
     mapboxMap = map;
-    annotationManager =
-        await map.annotations.createPointAnnotationManager();
-
+    annotationManager = await map.annotations.createPointAnnotationManager();
   }
 
-  // ── POIs — detectar ciudad y cargar ───────────────────
+  // ── POIs ──────────────────────────────────────────────
   Future<void> _detectAndLoadCityPOIs() async {
-    if (!_poisVisible || mapboxMap == null) return;
-    if (_poiLoading) return;
-
+    if (!_poisVisible || mapboxMap == null || _poiLoading) return;
     try {
-    // ✅ FIX — getCameraState() devuelve CameraState, hay que
-    // convertirlo a CameraOptions antes de pasarlo a coordinateBoundsForCamera
-    final cameraState = await mapboxMap!.getCameraState();
-
-    final bounds = await mapboxMap!.coordinateBoundsForCamera(
-      mapbox.CameraOptions(
-        center:  cameraState.center,     // ✅ Point
-        zoom:    cameraState.zoom,       // ✅ double
-        bearing: cameraState.bearing,    // ✅ double
-        pitch:   cameraState.pitch,      // ✅ double
-      ),
-    );
-
-      // Evitar refetch si los bounds no cambiaron
-      if (_lastFetchedBounds != null &&
-          _boundsAreSimilar(bounds, _lastFetchedBounds!)) return;
+      final cameraState = await mapboxMap!.getCameraState();
+      final bounds = await mapboxMap!.coordinateBoundsForCamera(
+        mapbox.CameraOptions(
+          center:  cameraState.center,
+          zoom:    cameraState.zoom,
+          bearing: cameraState.bearing,
+          pitch:   cameraState.pitch,
+        ),
+      );
+      if (_lastFetchedBounds != null && _boundsAreSimilar(bounds, _lastFetchedBounds!)) return;
       _lastFetchedBounds = bounds;
-
       setState(() => _poiLoading = true);
-
       final swLat = bounds.southwest.coordinates.lat.toDouble();
       final swLng = bounds.southwest.coordinates.lng.toDouble();
       final neLat = bounds.northeast.coordinates.lat.toDouble();
       final neLng = bounds.northeast.coordinates.lng.toDouble();
-
-      // Detectar ciudad actual
       if (_currentPosition != null) {
-        await _detectCurrentCity(
-          _currentPosition!.latitude,
-          _currentPosition!.longitude,
-        );
+        await _detectCurrentCity(_currentPosition!.latitude, _currentPosition!.longitude);
       }
-
-      await _fetchPOIsForBounds(
-        swLat: swLat,
-        swLng: swLng,
-        neLat: neLat,
-        neLng: neLng,
-      );
+      await _fetchPOIsForBounds(swLat: swLat, swLng: swLng, neLat: neLat, neLng: neLng);
     } catch (_) {
     } finally {
       if (mounted) setState(() => _poiLoading = false);
     }
   }
 
-  // ── Comparar bounds ───────────────────────────────────
-  bool _boundsAreSimilar(
-    mapbox.CoordinateBounds a,
-    mapbox.CoordinateBounds b,
-  ) {
-    const threshold = 0.01;
-    return (a.southwest.coordinates.lat.toDouble() -
-                b.southwest.coordinates.lat.toDouble()).abs() < threshold &&
-           (a.southwest.coordinates.lng.toDouble() -
-                b.southwest.coordinates.lng.toDouble()).abs() < threshold &&
-           (a.northeast.coordinates.lat.toDouble() -
-                b.northeast.coordinates.lat.toDouble()).abs() < threshold &&
-           (a.northeast.coordinates.lng.toDouble() -
-                b.northeast.coordinates.lng.toDouble()).abs() < threshold;
+  bool _boundsAreSimilar(mapbox.CoordinateBounds a, mapbox.CoordinateBounds b) {
+    const t = 0.01;
+    return (a.southwest.coordinates.lat.toDouble() - b.southwest.coordinates.lat.toDouble()).abs() < t &&
+           (a.southwest.coordinates.lng.toDouble() - b.southwest.coordinates.lng.toDouble()).abs() < t &&
+           (a.northeast.coordinates.lat.toDouble() - b.northeast.coordinates.lat.toDouble()).abs() < t &&
+           (a.northeast.coordinates.lng.toDouble() - b.northeast.coordinates.lng.toDouble()).abs() < t;
   }
 
-  // ── Detectar ciudad actual ────────────────────────────
   Future<void> _detectCurrentCity(double lat, double lng) async {
     try {
-      final url = Uri.parse(
-        'https://api.mapbox.com/geocoding/v5/mapbox.places/'
-        '$lng,$lat.json'
+      final response = await http.get(Uri.parse(
+        'https://api.mapbox.com/geocoding/v5/mapbox.places/$lng,$lat.json'
         '?types=place&access_token=$_mapboxToken&language=es&limit=1',
-      );
-      final response = await http.get(url);
+      ));
       if (response.statusCode == 200) {
-        final data     = json.decode(response.body);
-        final features = data['features'] as List;
+        final features = (json.decode(response.body)['features'] as List);
         if (features.isNotEmpty && mounted) {
           final city = features[0]['text'] as String;
           if (city != _currentCity) {
             setState(() => _currentCity = city);
-            _lastFetchedBounds = null; // forzar recarga al cambiar ciudad
+            _lastFetchedBounds = null;
           }
         }
       }
     } catch (_) {}
   }
 
-  // ── Fetch POIs por bounding box ───────────────────────
   Future<void> _fetchPOIsForBounds({
-    required double swLat,
-    required double swLng,
-    required double neLat,
-    required double neLng,
+    required double swLat, required double swLng,
+    required double neLat, required double neLng,
   }) async {
     final bbox = '$swLat,$swLng,$neLat,$neLng';
-
-    // Cargar todas las categorías en paralelo
-    await Future.wait(
-      _poiCategories.map((category) async {
-        final query = '''
-[out:json][timeout:25];
-(
-  node[${category['query']}]($bbox);
-  way[${category['query']}]($bbox);
-  relation[${category['query']}]($bbox);
-);
-out center;
-''';
-        try {
-          final response = await http.post(
-            Uri.parse('https://overpass-api.de/api/interpreter'),
-            body: query,
-          );
-
-          if (response.statusCode != 200) return;
-
-          final data     = json.decode(response.body);
-          final elements = data['elements'] as List;
-
-          final features = elements.map((e) {
-            final pLat = e['type'] == 'node'
-                ? e['lat'] as double
-                : (e['center']?['lat'] as double? ?? 0.0);
-            final pLng = e['type'] == 'node'
-                ? e['lon'] as double
-                : (e['center']?['lon'] as double? ?? 0.0);
-            final name =
-                (e['tags']?['name'] as String?) ?? category['label']!;
-
-            return {
-              'type': 'Feature',
-              'geometry': {
-                'type': 'Point',
-                'coordinates': [pLng, pLat],
-              },
-              'properties': {
-                'name': name,
-                'category': category['id'],
-              },
-            };
-          }).toList();
-
-          await _updatePoiLayer(
-            sourceId: 'poi-${category['id']}-source',
-            layerId:  'poi-${category['id']}-layer',
-            iconName: category['icon']!,
-            geoJson:  json.encode({
-              'type': 'FeatureCollection',
-              'features': features,
-            }),
-          );
-        } catch (_) {}
-      }),
-    );
+    await Future.wait(_poiCategories.map((category) async {
+      final query = '[out:json][timeout:25];\n(\n'
+          '  node[${category['query']}]($bbox);\n'
+          '  way[${category['query']}]($bbox);\n'
+          '  relation[${category['query']}]($bbox);\n'
+          ');\nout center;\n';
+      try {
+        final response = await http.post(
+            Uri.parse('https://overpass-api.de/api/interpreter'), body: query);
+        if (response.statusCode != 200) return;
+        final elements = (json.decode(response.body)['elements'] as List);
+        final features = elements.map((e) {
+          final pLat = e['type'] == 'node' ? e['lat'] as double : (e['center']?['lat'] as double? ?? 0.0);
+          final pLng = e['type'] == 'node' ? e['lon'] as double : (e['center']?['lon'] as double? ?? 0.0);
+          return {
+            'type': 'Feature',
+            'geometry': {'type': 'Point', 'coordinates': [pLng, pLat]},
+            'properties': {
+              'name': (e['tags']?['name'] as String?) ?? category['label']!,
+              'category': category['id'],
+            },
+          };
+        }).toList();
+        await _updatePoiLayer(
+          sourceId: 'poi-${category['id']}-source',
+          layerId:  'poi-${category['id']}-layer',
+          iconName: category['icon']!,
+          geoJson:  json.encode({'type': 'FeatureCollection', 'features': features}),
+        );
+      } catch (_) {}
+    }));
   }
 
-  // ── Crear o actualizar SymbolLayer ────────────────────
   Future<void> _updatePoiLayer({
-    required String sourceId,
-    required String layerId,
-    required String iconName,
-    required String geoJson,
+    required String sourceId, required String layerId,
+    required String iconName, required String geoJson,
   }) async {
     if (mapboxMap == null) return;
     try {
       final style = await mapboxMap!.style;
       try { await style.removeStyleLayer(layerId);  } catch (_) {}
       try { await style.removeStyleSource(sourceId); } catch (_) {}
-
-      await style.addSource(mapbox.GeoJsonSource(
-        id:   sourceId,
-        data: geoJson,
-      ));
-
+      await style.addSource(mapbox.GeoJsonSource(id: sourceId, data: geoJson));
       await style.addLayer(mapbox.SymbolLayer(
-        id:               layerId,
-        sourceId:         sourceId,
-        iconImage:        iconName,
-        iconSize:         1.2,
-        iconAllowOverlap: false,
-        textField:        '{name}',
-        textSize:         10.0,
-        textOffset:       [0.0, 1.8],
-        textAllowOverlap: false,
-        textOptional:     true,
+        id: layerId, sourceId: sourceId,
+        iconImage: iconName, iconSize: 1.2, iconAllowOverlap: false,
+        textField: '{name}', textSize: 10.0,
+        textOffset: [0.0, 1.8], textAllowOverlap: false, textOptional: true,
       ));
     } catch (_) {}
   }
 
-  // ── Limpiar todos los POIs ────────────────────────────
   Future<void> _clearPOIs() async {
     if (mapboxMap == null) return;
     try {
       final style = await mapboxMap!.style;
-      for (final category in _poiCategories) {
-        try {
-          await style.removeStyleLayer('poi-${category['id']}-layer');
-          await style.removeStyleSource('poi-${category['id']}-source');
-        } catch (_) {}
+      for (final c in _poiCategories) {
+        try { await style.removeStyleLayer('poi-${c['id']}-layer');  } catch (_) {}
+        try { await style.removeStyleSource('poi-${c['id']}-source'); } catch (_) {}
       }
       _lastFetchedBounds = null;
     } catch (_) {}
   }
 
-  // ── Utilidades de ruta ────────────────────────────────
-  double _distanceBetween(
-      double lat1, double lng1, double lat2, double lng2) {
+  // ── Utilidades ruta ───────────────────────────────────
+  double _distanceBetween(double lat1, double lng1, double lat2, double lng2) {
     const R = 6371000.0;
     final dLat = (lat2 - lat1) * pi / 180;
     final dLng = (lng2 - lng1) * pi / 180;
     final a = sin(dLat / 2) * sin(dLat / 2) +
-        cos(lat1 * pi / 180) *
-            cos(lat2 * pi / 180) *
-            sin(dLng / 2) *
-            sin(dLng / 2);
+        cos(lat1 * pi / 180) * cos(lat2 * pi / 180) * sin(dLng / 2) * sin(dLng / 2);
     return R * 2 * atan2(sqrt(a), sqrt(1 - a));
   }
 
   int _findClosestPointIndex(double lat, double lng) {
     double minDist = double.infinity;
-    int closestIndex = 0;
+    int idx = 0;
     for (int i = 0; i < _routeCoordinates.length; i++) {
-      final coord = _routeCoordinates[i];
-      final dist  = _distanceBetween(lat, lng, coord[1], coord[0]);
-      if (dist < minDist) {
-        minDist      = dist;
-        closestIndex = i;
-      }
+      final d = _distanceBetween(lat, lng, _routeCoordinates[i][1], _routeCoordinates[i][0]);
+      if (d < minDist) { minDist = d; idx = i; }
     }
-    return closestIndex;
+    return idx;
   }
 
   List<double> _snapToRoute(double lat, double lng) {
     if (_routeCoordinates.length < 2) return [lng, lat];
     double minDist = double.infinity;
-    List<double> snappedPoint = [lng, lat];
+    List<double> snapped = [lng, lat];
     for (int i = 0; i < _routeCoordinates.length - 1; i++) {
-      final a   = _routeCoordinates[i];
-      final b   = _routeCoordinates[i + 1];
-      final abX = b[0] - a[0];
-      final abY = b[1] - a[1];
-      final apX = lng - a[0];
-      final apY = lat - a[1];
-      final ab2 = abX * abX + abY * abY;
+      final a = _routeCoordinates[i];
+      final b = _routeCoordinates[i + 1];
+      final abX = b[0]-a[0]; final abY = b[1]-a[1];
+      final apX = lng-a[0];  final apY = lat-a[1];
+      final ab2 = abX*abX + abY*abY;
       if (ab2 == 0) continue;
-      final t       = ((apX * abX + apY * abY) / ab2).clamp(0.0, 1.0);
-      final projLng = a[0] + t * abX;
-      final projLat = a[1] + t * abY;
-      final dist    = _distanceBetween(lat, lng, projLat, projLng);
-      if (dist < minDist) {
-        minDist      = dist;
-        snappedPoint = [projLng, projLat];
-      }
+      final t = ((apX*abX + apY*abY) / ab2).clamp(0.0, 1.0);
+      final pLng = a[0]+t*abX; final pLat = a[1]+t*abY;
+      final d = _distanceBetween(lat, lng, pLat, pLng);
+      if (d < minDist) { minDist = d; snapped = [pLng, pLat]; }
     }
-    return snappedPoint;
+    return snapped;
   }
 
-  double _bearingBetween(
-      double lat1, double lng1, double lat2, double lng2) {
-    final dLng  = (lng2 - lng1) * pi / 180;
-    final lat1R = lat1 * pi / 180;
-    final lat2R = lat2 * pi / 180;
-    final y     = sin(dLng) * cos(lat2R);
-    final x     = cos(lat1R) * sin(lat2R) -
-        sin(lat1R) * cos(lat2R) * cos(dLng);
-    return (atan2(y, x) * 180 / pi + 360) % 360;
+  double _bearingBetween(double lat1, double lng1, double lat2, double lng2) {
+    final dLng = (lng2-lng1)*pi/180;
+    final y = sin(dLng)*cos(lat2*pi/180);
+    final x = cos(lat1*pi/180)*sin(lat2*pi/180) - sin(lat1*pi/180)*cos(lat2*pi/180)*cos(dLng);
+    return (atan2(y, x)*180/pi + 360) % 360;
   }
 
   Future<void> _updateRemainingRoute(double lat, double lng) async {
-    if (!_navigating || _routeCoordinates.isEmpty) return;
-    if (mapboxMap == null) return;
-    final closestIndex = _findClosestPointIndex(lat, lng);
-    if (closestIndex >= _routeCoordinates.length - 2) {
+    if (!_navigating || _routeCoordinates.isEmpty || mapboxMap == null) return;
+    final idx = _findClosestPointIndex(lat, lng);
+    if (idx >= _routeCoordinates.length - 2) {
       await _cancelRoute();
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('🏁 ¡Has llegado a tu destino!'),
-            backgroundColor: Colors.green,
-            duration: Duration(seconds: 3),
-          ),
-        );
-      }
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+        content: Text('🏁 ¡Has llegado a tu destino!'),
+        backgroundColor: Colors.green,
+        duration: Duration(seconds: 3),
+      ));
       return;
     }
-    final remainingCoords = _routeCoordinates.sublist(closestIndex);
-    if (remainingCoords.length < 2) return;
+    final remaining = _routeCoordinates.sublist(idx);
+    if (remaining.length < 2) return;
     try {
       final style = await mapboxMap!.style;
-      await style.setStyleSourceProperty(
-        'route-source',
-        'data',
-        json.encode({
-          'type': 'Feature',
-          'geometry': {
-            'type': 'LineString',
-            'coordinates': remainingCoords,
-          },
-        }),
-      );
+      await style.setStyleSourceProperty('route-source', 'data', json.encode({
+        'type': 'Feature',
+        'geometry': {'type': 'LineString', 'coordinates': remaining},
+      }));
     } catch (_) {}
   }
 
-  // ── Tap en mapa ───────────────────────────────────────
+  // ── Tap mapa ──────────────────────────────────────────
   void _onMapTap(mapbox.MapContentGestureContext context) {
     if (_navigating) return;
     final lat = context.point.coordinates.lat.toDouble();
     final lng = context.point.coordinates.lng.toDouble();
-    setState(() {
-      _tappedLat     = lat;
-      _tappedLng     = lng;
-      _showTapConfirm = true;
-      _searchResults  = [];
-    });
+    setState(() { _tappedLat = lat; _tappedLng = lng; _showTapConfirm = true; _searchResults = []; });
     _addDestinationMarker(lat, lng);
     mapboxMap?.flyTo(
       mapbox.CameraOptions(
-        center: mapbox.Point(
-          coordinates: mapbox.Position(lng, lat),
-        ),
-        zoom:    16.0,
-        pitch:   0.0,
-        bearing: 0.0,
+        center: mapbox.Point(coordinates: mapbox.Position(lng, lat)),
+        zoom: 16.0, pitch: 0.0, bearing: 0.0,
       ),
       mapbox.MapAnimationOptions(duration: 800, startDelay: 0),
     );
@@ -758,27 +520,20 @@ out center;
 
   Future<void> _confirmTappedDestination() async {
     if (_tappedLat == null || _tappedLng == null) return;
-    final url = Uri.parse(
-      'https://api.mapbox.com/geocoding/v5/mapbox.places/'
-      '$_tappedLng,$_tappedLat.json'
-      '?access_token=$_mapboxToken&language=es&limit=1',
-    );
     String placeName = 'Destino seleccionado';
-    final response   = await http.get(url);
-    if (response.statusCode == 200) {
-      final data     = json.decode(response.body);
-      final features = data['features'] as List;
-      if (features.isNotEmpty) {
-        placeName = features[0]['place_name'] as String;
+    try {
+      final response = await http.get(Uri.parse(
+        'https://api.mapbox.com/geocoding/v5/mapbox.places/$_tappedLng,$_tappedLat.json'
+        '?access_token=$_mapboxToken&language=es&limit=1',
+      ));
+      if (response.statusCode == 200) {
+        final features = json.decode(response.body)['features'] as List;
+        if (features.isNotEmpty) placeName = features[0]['place_name'] as String;
       }
-    }
+    } catch (_) {}
     setState(() {
-      _selectedPlace = {
-        'name': placeName,
-        'lat':  _tappedLat,
-        'lng':  _tappedLng,
-      };
-      _showTapConfirm       = false;
+      _selectedPlace = {'name': placeName, 'lat': _tappedLat, 'lng': _tappedLng};
+      _showTapConfirm = false;
       _searchController.text = placeName;
     });
     await _getRoute(_tappedLat!, _tappedLng!);
@@ -789,256 +544,23 @@ out center;
       await annotationManager!.delete(destinationAnnotation!);
       destinationAnnotation = null;
     }
-    setState(() {
-      _showTapConfirm = false;
-      _tappedLat      = null;
-      _tappedLng      = null;
-    });
+    setState(() { _showTapConfirm = false; _tappedLat = null; _tappedLng = null; });
   }
 
-  // ── Marcador moto ─────────────────────────────────────
-  Future<void> _updateMotoMarker(
-      double lat, double lng, double bearing) async {
+  // ── Marcadores ────────────────────────────────────────
+  Future<void> _updateMotoMarker(double lat, double lng, double bearing) async {
     if (annotationManager == null || motoImage == null) return;
-
     if (motoAnnotation == null) {
-      motoAnnotation = await annotationManager!.create(
-        mapbox.PointAnnotationOptions(
-          geometry: mapbox.Point(
-              coordinates: mapbox.Position(lng, lat)),
-          image:       motoImage,
-          iconSize:    1.2,
-          iconAnchor:  mapbox.IconAnchor.CENTER,
-          iconRotate:  bearing,
-        ),
-      );
+      motoAnnotation = await annotationManager!.create(mapbox.PointAnnotationOptions(
+        geometry: mapbox.Point(coordinates: mapbox.Position(lng, lat)),
+        image: motoImage, iconSize: 1.2,
+        iconAnchor: mapbox.IconAnchor.CENTER, iconRotate: bearing,
+      ));
     } else {
-      motoAnnotation!.geometry =
-          mapbox.Point(coordinates: mapbox.Position(lng, lat));
+      motoAnnotation!.geometry = mapbox.Point(coordinates: mapbox.Position(lng, lat));
       motoAnnotation!.iconRotate = bearing;
       await annotationManager!.update(motoAnnotation!);
     }
-  }
-
-  // ── Tracking GPS ──────────────────────────────────────
-  void _startLocationTracking() {
-    Geolocator.getPositionStream(
-      locationSettings: const LocationSettings(
-        accuracy:       LocationAccuracy.bestForNavigation,
-        distanceFilter: 2,
-      ),
-    ).listen((Position position) {
-      if (!mounted) return;
-
-      setState(() {
-        _currentSpeed    = position.speed * 3.6;
-        _currentPosition = position;
-      });
-
-      if (_navigating && _routeCoordinates.isNotEmpty) {
-        final snapped    = _snapToRoute(position.latitude, position.longitude);
-        final snappedLng = snapped[0];
-        final snappedLat = snapped[1];
-        final closestIdx = _findClosestPointIndex(
-            position.latitude, position.longitude);
-
-        double routeBearing = position.heading;
-        if (closestIdx < _routeCoordinates.length - 1) {
-          final curr  = _routeCoordinates[closestIdx];
-          final next  = _routeCoordinates[closestIdx + 1];
-          routeBearing = _bearingBetween(curr[1], curr[0], next[1], next[0]);
-        }
-
-        _updateMotoMarker(snappedLat, snappedLng, routeBearing);
-        _updateRemainingRoute(position.latitude, position.longitude);
-
-        mapboxMap?.flyTo(
-          mapbox.CameraOptions(
-            center: mapbox.Point(
-                coordinates: mapbox.Position(snappedLng, snappedLat)),
-            zoom:    17.0,
-            bearing: routeBearing,
-            pitch:   50.0,
-          ),
-          mapbox.MapAnimationOptions(duration: 1000, startDelay: 0),
-        );
-      } else {
-        _updateMotoMarker(
-            position.latitude, position.longitude, position.heading);
-        if (!_routeDrawn && !_showTapConfirm) {
-          mapboxMap?.setCamera(mapbox.CameraOptions(
-            center: mapbox.Point(
-                coordinates: mapbox.Position(
-                    position.longitude, position.latitude)),
-            zoom:    _calculateDynamicZoom(_currentSpeed),
-            bearing: position.heading,
-          ));
-        }
-      }
-    });
-  }
-
-  // ── Búsqueda ──────────────────────────────────────────
-  Future<void> _searchPlaces(String query) async {
-  if (query.isEmpty) {
-    setState(() => _searchResults = []);
-    return;
-  }
-
-  // ✅ Construir URL con sesgo de proximidad a tu posición actual
-  String url;
-
-  if (_currentPosition != null) {
-    final lat = _currentPosition!.latitude;
-    final lng = _currentPosition!.longitude;
-
-    // ✅ proximity  → prioriza resultados cerca de ti
-    // ✅ bbox       → limita resultados a ~50km alrededor
-    final double offset = 0.45; // ~50km en grados
-    final double minLng = lng - offset;
-    final double minLat = lat - offset;
-    final double maxLng = lng + offset;
-    final double maxLat = lat + offset;
-
-    url =
-      'https://api.mapbox.com/geocoding/v5/mapbox.places/'
-      '${Uri.encodeComponent(query)}.json'
-      '?access_token=$_mapboxToken'
-      '&language=es'
-      '&limit=6'
-      '&proximity=$lng,$lat'           // ✅ ordena por cercanía
-      '&bbox=$minLng,$minLat,$maxLng,$maxLat'; // ✅ limita área
-  } else {
-    // Sin posición aún — búsqueda normal
-    url =
-      'https://api.mapbox.com/geocoding/v5/mapbox.places/'
-      '${Uri.encodeComponent(query)}.json'
-      '?access_token=$_mapboxToken'
-      '&language=es'
-      '&limit=6';
-  }
-
-  try {
-    final response = await http.get(Uri.parse(url));
-    if (response.statusCode == 200) {
-      final data     = json.decode(response.body);
-      final features = data['features'] as List;
-
-      setState(() {
-        _searchResults = features.map((f) {
-          // ✅ Calcular distancia para mostrarla en el resultado
-          final resLng = f['center'][0] as double;
-          final resLat = f['center'][1] as double;
-          double? distKm;
-
-          if (_currentPosition != null) {
-            final distM = _distanceBetween(
-              _currentPosition!.latitude,
-              _currentPosition!.longitude,
-              resLat,
-              resLng,
-            );
-            distKm = distM / 1000;
-          }
-
-          return {
-            'name':    f['place_name'] as String,
-            'short':   f['text'] as String,         // ✅ nombre corto
-            'lng':     resLng,
-            'lat':     resLat,
-            'distKm':  distKm,
-          };
-        }).toList();
-      });
-    }
-  } catch (_) {}
-}
-  // ── Ruta ──────────────────────────────────────────────
-  Future<void> _getRoute(double destLat, double destLng) async {
-    if (_currentPosition == null) return;
-    final url = Uri.parse(
-      'https://api.mapbox.com/directions/v5/mapbox/driving/'
-      '${_currentPosition!.longitude},${_currentPosition!.latitude};'
-      '$destLng,$destLat'
-      '?geometries=geojson&access_token=$_mapboxToken&language=es&overview=full',
-    );
-    final response = await http.get(url);
-    if (response.statusCode == 200) {
-      final data        = json.decode(response.body);
-      final routes      = data['routes'] as List;
-      if (routes.isEmpty) return;
-      final route       = routes[0];
-      final geometry    = route['geometry'];
-      final distanceKm  =
-          ((route['distance'] as double) / 1000).toStringAsFixed(1);
-      final durationMin =
-          ((route['duration'] as double) / 60).round();
-      final coords      = (geometry['coordinates'] as List)
-          .map((c) => [c[0] as double, c[1] as double])
-          .toList();
-      setState(() {
-        _routeDistance    = '$distanceKm km';
-        _routeDuration    = '$durationMin min';
-        _routeDrawn       = true;
-        _routeCoordinates = coords;
-      });
-      await _drawRouteOnMap(geometry);
-      _fitRouteBounds(destLat, destLng);
-    }
-  }
-
-  Future<void> _drawRouteOnMap(Map<String, dynamic> geometry) async {
-    final style = await mapboxMap!.style;
-    try {
-      await style.removeStyleLayer('route-layer');
-      await style.removeStyleSource('route-source');
-    } catch (_) {}
-    await style.addSource(mapbox.GeoJsonSource(
-      id:   'route-source',
-      data: json.encode({'type': 'Feature', 'geometry': geometry}),
-    ));
-    await style.addLayer(mapbox.LineLayer(
-      id:        'route-layer',
-      sourceId:  'route-source',
-      lineColor: 0xFF1976D2,
-      lineWidth: 6.0,
-      lineCap:   mapbox.LineCap.ROUND,
-      lineJoin:  mapbox.LineJoin.ROUND,
-    ));
-  }
-
-  void _fitRouteBounds(double destLat, double destLng) {
-    if (_currentPosition == null) return;
-    mapboxMap?.flyTo(
-      mapbox.CameraOptions(
-        center: mapbox.Point(
-          coordinates: mapbox.Position(
-            (_currentPosition!.longitude + destLng) / 2,
-            (_currentPosition!.latitude + destLat) / 2,
-          ),
-        ),
-        zoom:    12.0,
-        bearing: 0.0,
-        pitch:   0.0,
-      ),
-      mapbox.MapAnimationOptions(duration: 1500, startDelay: 0),
-    );
-  }
-
-  void _goToPlace(double lat, double lng, String name) async {
-    Navigator.of(context).popUntil((route) => route.isFirst);
-    setState(() {
-      _searchResults         = [];
-      _searchController.text = name;
-      _selectedPlace         = {'name': name, 'lat': lat, 'lng': lng};
-      _routeDrawn            = false;
-      _navigating            = false;
-      _showTapConfirm        = false;
-      _routeCoordinates      = [];
-    });
-    FocusScope.of(context).unfocus();
-    await _addDestinationMarker(lat, lng);
-    await _getRoute(lat, lng);
   }
 
   Future<void> _addDestinationMarker(double lat, double lng) async {
@@ -1047,24 +569,174 @@ out center;
       await annotationManager!.delete(destinationAnnotation!);
       destinationAnnotation = null;
     }
-    destinationAnnotation = await annotationManager!.create(
-      mapbox.PointAnnotationOptions(
-        geometry:   mapbox.Point(
-          coordinates: mapbox.Position(lng, lat),
-        ),
-        image:      pinImage,
-        iconSize:   1.2,
-        iconAnchor: mapbox.IconAnchor.BOTTOM,
+    destinationAnnotation = await annotationManager!.create(mapbox.PointAnnotationOptions(
+      geometry: mapbox.Point(coordinates: mapbox.Position(lng, lat)),
+      image: pinImage, iconSize: 1.2, iconAnchor: mapbox.IconAnchor.BOTTOM,
+    ));
+  }
+
+  // ── GPS Tracking ──────────────────────────────────────
+  void _startLocationTracking() {
+    Geolocator.getPositionStream(
+      locationSettings: const LocationSettings(
+        accuracy: LocationAccuracy.bestForNavigation, distanceFilter: 2),
+    ).listen((Position position) {
+      if (!mounted) return;
+      setState(() { _currentSpeed = position.speed * 3.6; _currentPosition = position; });
+      if (_navigating && _routeCoordinates.isNotEmpty) {
+        final snapped    = _snapToRoute(position.latitude, position.longitude);
+        final snappedLng = snapped[0];
+        final snappedLat = snapped[1];
+        final idx        = _findClosestPointIndex(position.latitude, position.longitude);
+        double bearing   = position.heading;
+        if (idx < _routeCoordinates.length - 1) {
+          bearing = _bearingBetween(
+              _routeCoordinates[idx][1], _routeCoordinates[idx][0],
+              _routeCoordinates[idx+1][1], _routeCoordinates[idx+1][0]);
+        }
+        _updateMotoMarker(snappedLat, snappedLng, bearing);
+        _updateRemainingRoute(position.latitude, position.longitude);
+        mapboxMap?.flyTo(
+          mapbox.CameraOptions(
+            center: mapbox.Point(coordinates: mapbox.Position(snappedLng, snappedLat)),
+            zoom: 17.0, bearing: bearing, pitch: 50.0,
+          ),
+          mapbox.MapAnimationOptions(duration: 1000, startDelay: 0),
+        );
+      } else {
+        _updateMotoMarker(position.latitude, position.longitude, position.heading);
+        if (!_routeDrawn && !_showTapConfirm) {
+          mapboxMap?.setCamera(mapbox.CameraOptions(
+            center: mapbox.Point(coordinates: mapbox.Position(position.longitude, position.latitude)),
+            zoom: _calculateDynamicZoom(_currentSpeed),
+            bearing: position.heading,
+          ));
+        }
+      }
+    });
+  }
+
+  // ── Búsqueda con bias de posición ─────────────────────
+  Future<void> _searchPlaces(String query) async {
+    if (query.isEmpty) { setState(() => _searchResults = []); return; }
+    String url;
+    if (_currentPosition != null) {
+      final lat = _currentPosition!.latitude;
+      final lng = _currentPosition!.longitude;
+      const double offset = 0.45;
+      url = 'https://api.mapbox.com/geocoding/v5/mapbox.places/'
+            '${Uri.encodeComponent(query)}.json'
+            '?access_token=$_mapboxToken&language=es&limit=6'
+            '&proximity=$lng,$lat'
+            '&bbox=${lng-offset},${lat-offset},${lng+offset},${lat+offset}';
+    } else {
+      url = 'https://api.mapbox.com/geocoding/v5/mapbox.places/'
+            '${Uri.encodeComponent(query)}.json'
+            '?access_token=$_mapboxToken&language=es&limit=6';
+    }
+    try {
+      final response = await http.get(Uri.parse(url));
+      if (response.statusCode == 200) {
+        final features = json.decode(response.body)['features'] as List;
+        setState(() {
+          _searchResults = features.map((f) {
+            final resLng = f['center'][0] as double;
+            final resLat = f['center'][1] as double;
+            double? distKm;
+            if (_currentPosition != null) {
+              distKm = _distanceBetween(
+                  _currentPosition!.latitude, _currentPosition!.longitude,
+                  resLat, resLng) / 1000;
+            }
+            return {
+              'name':    f['place_name'] as String,
+              'short':   f['text'] as String,
+              'lng':     resLng,
+              'lat':     resLat,
+              'distKm':  distKm,
+            };
+          }).toList();
+        });
+      }
+    } catch (_) {}
+  }
+
+  // ── Ruta ──────────────────────────────────────────────
+  Future<void> _getRoute(double destLat, double destLng) async {
+    if (_currentPosition == null) return;
+    try {
+      final response = await http.get(Uri.parse(
+        'https://api.mapbox.com/directions/v5/mapbox/driving/'
+        '${_currentPosition!.longitude},${_currentPosition!.latitude};$destLng,$destLat'
+        '?geometries=geojson&access_token=$_mapboxToken&language=es&overview=full',
+      ));
+      if (response.statusCode == 200) {
+        final data   = json.decode(response.body);
+        final routes = data['routes'] as List;
+        if (routes.isEmpty) return;
+        final route    = routes[0];
+        final geometry = route['geometry'];
+        final coords   = (geometry['coordinates'] as List)
+            .map((c) => [c[0] as double, c[1] as double]).toList();
+        setState(() {
+          _routeDistance    = '${((route['distance'] as double)/1000).toStringAsFixed(1)} km';
+          _routeDuration    = '${((route['duration'] as double)/60).round()} min';
+          _routeDrawn       = true;
+          _routeCoordinates = coords;
+        });
+        await _drawRouteOnMap(geometry);
+        _fitRouteBounds(destLat, destLng);
+      }
+    } catch (_) {}
+  }
+
+  Future<void> _drawRouteOnMap(Map<String, dynamic> geometry) async {
+    final style = await mapboxMap!.style;
+    try { await style.removeStyleLayer('route-layer');  } catch (_) {}
+    try { await style.removeStyleSource('route-source'); } catch (_) {}
+    await style.addSource(mapbox.GeoJsonSource(
+        id: 'route-source',
+        data: json.encode({'type': 'Feature', 'geometry': geometry})));
+    await style.addLayer(mapbox.LineLayer(
+      id: 'route-layer', sourceId: 'route-source',
+      lineColor: 0xFF1976D2, lineWidth: 6.0,
+      lineCap: mapbox.LineCap.ROUND, lineJoin: mapbox.LineJoin.ROUND,
+    ));
+  }
+
+  void _fitRouteBounds(double destLat, double destLng) {
+    if (_currentPosition == null) return;
+    mapboxMap?.flyTo(
+      mapbox.CameraOptions(
+        center: mapbox.Point(coordinates: mapbox.Position(
+          (_currentPosition!.longitude + destLng) / 2,
+          (_currentPosition!.latitude  + destLat) / 2,
+        )),
+        zoom: 12.0, bearing: 0.0, pitch: 0.0,
       ),
+      mapbox.MapAnimationOptions(duration: 1500, startDelay: 0),
     );
+  }
+
+  void _goToPlace(double lat, double lng, String name) async {
+    Navigator.of(context).popUntil((route) => route.isFirst);
+    setState(() {
+      _searchResults = []; _searchController.text = name;
+      _selectedPlace = {'name': name, 'lat': lat, 'lng': lng};
+      _routeDrawn = false; _navigating = false;
+      _showTapConfirm = false; _routeCoordinates = [];
+    });
+    FocusScope.of(context).unfocus();
+    await _addDestinationMarker(lat, lng);
+    await _getRoute(lat, lng);
   }
 
   Future<void> _cancelRoute() async {
     if (mapboxMap != null) {
       try {
         final style = await mapboxMap!.style;
-        await style.removeStyleLayer('route-layer');
-        await style.removeStyleSource('route-source');
+        try { await style.removeStyleLayer('route-layer');  } catch (_) {}
+        try { await style.removeStyleSource('route-source'); } catch (_) {}
       } catch (_) {}
     }
     if (destinationAnnotation != null && annotationManager != null) {
@@ -1072,15 +744,9 @@ out center;
       destinationAnnotation = null;
     }
     setState(() {
-      _selectedPlace    = null;
-      _routeDrawn       = false;
-      _navigating       = false;
-      _showTapConfirm   = false;
-      _tappedLat        = null;
-      _tappedLng        = null;
-      _routeDistance    = '';
-      _routeDuration    = '';
-      _routeCoordinates = [];
+      _selectedPlace = null; _routeDrawn = false; _navigating = false;
+      _showTapConfirm = false; _tappedLat = null; _tappedLng = null;
+      _routeDistance = ''; _routeDuration = ''; _routeCoordinates = [];
       _searchController.clear();
     });
   }
@@ -1090,25 +756,20 @@ out center;
     if (_currentPosition != null) {
       mapboxMap?.flyTo(
         mapbox.CameraOptions(
-          center: mapbox.Point(
-              coordinates: mapbox.Position(
-                  _currentPosition!.longitude,
-                  _currentPosition!.latitude)),
-          zoom:    17.0,
-          bearing: _currentPosition!.heading,
-          pitch:   50.0,
+          center: mapbox.Point(coordinates: mapbox.Position(
+              _currentPosition!.longitude, _currentPosition!.latitude)),
+          zoom: 17.0, bearing: _currentPosition!.heading, pitch: 50.0,
         ),
         mapbox.MapAnimationOptions(duration: 1500, startDelay: 0),
       );
     }
   }
 
-  // ── UI ────────────────────────────────────────────────
+  // ── BUILD ─────────────────────────────────────────────
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       key: _scaffoldKey,
-
       drawer: Drawer(
         child: SafeArea(
           child: Column(
@@ -1121,15 +782,10 @@ out center;
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: const [
                     Text('🏍️ MotoGPS',
-                        style: TextStyle(
-                          color: Colors.white,
-                          fontSize: 22,
-                          fontWeight: FontWeight.bold,
-                        )),
+                        style: TextStyle(color: Colors.white, fontSize: 22, fontWeight: FontWeight.bold)),
                     SizedBox(height: 4),
                     Text('Mis listas de lugares',
-                        style: TextStyle(
-                            color: Colors.white70, fontSize: 14)),
+                        style: TextStyle(color: Colors.white70, fontSize: 14)),
                   ],
                 ),
               ),
@@ -1139,18 +795,15 @@ out center;
                         child: Column(
                           mainAxisSize: MainAxisSize.min,
                           children: [
-                            const Text('📭',
-                                style: TextStyle(fontSize: 48)),
+                            const Text('📭', style: TextStyle(fontSize: 48)),
                             const SizedBox(height: 12),
                             const Text('No tienes listas aún',
-                                style: TextStyle(
-                                    color: Colors.grey, fontSize: 16)),
+                                style: TextStyle(color: Colors.grey, fontSize: 16)),
                             const SizedBox(height: 16),
                             ElevatedButton.icon(
-                              onPressed: _createList,
-                              icon: const Icon(Icons.add),
-                              label: const Text('Crear lista'),
-                            ),
+                                onPressed: _createList,
+                                icon: const Icon(Icons.add),
+                                label: const Text('Crear lista')),
                           ],
                         ),
                       )
@@ -1159,23 +812,18 @@ out center;
                         itemBuilder: (_, i) {
                           final list = _placeLists[i];
                           return ListTile(
-                            leading: Text(list.emoji,
-                                style: const TextStyle(fontSize: 28)),
+                            leading: Text(list.emoji, style: const TextStyle(fontSize: 28)),
                             title: Text(list.name,
-                                style: const TextStyle(
-                                    fontWeight: FontWeight.w600)),
+                                style: const TextStyle(fontWeight: FontWeight.w600)),
                             subtitle: Text(
                                 '${list.places.length} lugar${list.places.length == 1 ? '' : 'es'}'),
                             trailing: Row(
                               mainAxisSize: MainAxisSize.min,
                               children: [
                                 IconButton(
-                                  icon: const Icon(Icons.share,
-                                      color: Colors.blue, size: 20),
-                                  onPressed: () => _shareList(list),
-                                ),
-                                const Icon(Icons.chevron_right,
-                                    color: Colors.grey),
+                                    icon: const Icon(Icons.share, color: Colors.blue, size: 20),
+                                    onPressed: () => _shareList(list)),
+                                const Icon(Icons.chevron_right, color: Colors.grey),
                               ],
                             ),
                             onTap: () => _openList(list),
@@ -1210,55 +858,44 @@ out center;
       body: Stack(
         children: [
 
-          // ── Mapa principal ───────────────────────────
+          // ── Mapa ────────────────────────────────────
           SizedBox.expand(
             child: mapbox.MapWidget(
               key: const ValueKey("mapWidget"),
               onMapCreated: _onMapCreated,
               styleUri: mapbox.MapboxStyles.STANDARD,
               onTapListener: _onMapTap,
-              cameraOptions:
-                  mapbox.CameraOptions(zoom: 15.0, pitch: 0.0),
-
-              // ✅ AGREGA ESTO — listener correcto para v2.20.0
+              cameraOptions: mapbox.CameraOptions(zoom: 15.0, pitch: 0.0),
               onCameraChangeListener: (state) async {
                 if (_poisVisible && !_poiLoading) {
                   await _detectAndLoadCityPOIs();
                 }
-              },      
+              },
             ),
           ),
 
           // ── Botón menú ───────────────────────────────
           if (!_navigating)
             Positioned(
-              top: 50,
-              left: 16,
+              top: 50, left: 16,
               child: GestureDetector(
                 onTap: () => _scaffoldKey.currentState?.openDrawer(),
                 child: Container(
-                  width: 46,
-                  height: 46,
+                  width: 46, height: 46,
                   decoration: BoxDecoration(
                     color: Colors.white,
                     borderRadius: BorderRadius.circular(12),
-                    boxShadow: const [
-                      BoxShadow(
-                          color: Colors.black26,
-                          blurRadius: 8,
-                          offset: Offset(0, 2))
-                    ],
+                    boxShadow: const [BoxShadow(color: Colors.black26, blurRadius: 8, offset: Offset(0, 2))],
                   ),
                   child: const Icon(Icons.menu, color: Colors.black87),
                 ),
               ),
             ),
 
-          // ── Botón toggle POIs + nombre ciudad ────────
+          // ── Botón POIs ───────────────────────────────
           if (!_navigating)
             Positioned(
-              top: 108,
-              left: 16,
+              top: 108, left: 16,
               child: Column(
                 children: [
                   GestureDetector(
@@ -1272,51 +909,30 @@ out center;
                       }
                     },
                     child: Container(
-                      width: 46,
-                      height: 46,
+                      width: 46, height: 46,
                       decoration: BoxDecoration(
-                        color: _poisVisible
-                            ? Colors.blue[700]
-                            : Colors.white,
+                        color: _poisVisible ? Colors.blue[700] : Colors.white,
                         borderRadius: BorderRadius.circular(12),
-                        boxShadow: const [
-                          BoxShadow(
-                              color: Colors.black26,
-                              blurRadius: 8,
-                              offset: Offset(0, 2))
-                        ],
+                        boxShadow: const [BoxShadow(color: Colors.black26, blurRadius: 8, offset: Offset(0, 2))],
                       ),
                       child: _poiLoading
                           ? const Padding(
                               padding: EdgeInsets.all(12),
-                              child: CircularProgressIndicator(
-                                strokeWidth: 2,
-                                color: Colors.white,
-                              ),
+                              child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
                             )
-                          : Icon(
-                              Icons.place,
-                              color: _poisVisible
-                                  ? Colors.white
-                                  : Colors.black54,
-                            ),
+                          : Icon(Icons.place,
+                              color: _poisVisible ? Colors.white : Colors.black54),
                     ),
                   ),
-                  // Nombre de la ciudad
                   if (_currentCity.isNotEmpty && _poisVisible)
                     Container(
                       margin: const EdgeInsets.only(top: 4),
-                      padding: const EdgeInsets.symmetric(
-                          horizontal: 6, vertical: 3),
+                      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 3),
                       decoration: BoxDecoration(
-                        color: Colors.black54,
-                        borderRadius: BorderRadius.circular(8),
-                      ),
-                      child: Text(
-                        _currentCity,
-                        style: const TextStyle(
-                            color: Colors.white, fontSize: 10),
-                      ),
+                          color: Colors.black54,
+                          borderRadius: BorderRadius.circular(8)),
+                      child: Text(_currentCity,
+                          style: const TextStyle(color: Colors.white, fontSize: 10)),
                     ),
                 ],
               ),
@@ -1325,54 +941,40 @@ out center;
           // ── Barra de búsqueda ────────────────────────
           if (!_navigating)
             Positioned(
-              top: 50,
-              left: 72,
-              right: 16,
+              top: 50, left: 72, right: 16,
               child: Column(
                 children: [
                   Container(
                     decoration: BoxDecoration(
                       color: Colors.white,
                       borderRadius: BorderRadius.circular(12),
-                      boxShadow: const [
-                        BoxShadow(
-                            color: Colors.black26,
-                            blurRadius: 8,
-                            offset: Offset(0, 2))
-                      ],
+                      boxShadow: const [BoxShadow(color: Colors.black26, blurRadius: 8, offset: Offset(0, 2))],
                     ),
                     child: TextField(
                       controller: _searchController,
                       onChanged: _searchPlaces,
                       decoration: InputDecoration(
-                        hintText:  '🔍  Buscar lugar...',
+                        hintText: '🔍  Buscar lugar...',
                         hintStyle: const TextStyle(color: Colors.grey),
-                        border:    InputBorder.none,
-                        contentPadding: const EdgeInsets.symmetric(
-                            horizontal: 16, vertical: 14),
+                        border: InputBorder.none,
+                        contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
                         suffixIcon: _searchController.text.isNotEmpty
                             ? IconButton(
-                                icon: const Icon(Icons.clear,
-                                    color: Colors.grey),
-                                onPressed: _cancelRoute,
-                              )
-                            : const Icon(Icons.search,
-                                color: Colors.grey),
+                                icon: const Icon(Icons.clear, color: Colors.grey),
+                                onPressed: _cancelRoute)
+                            : const Icon(Icons.search, color: Colors.grey),
                       ),
                     ),
                   ),
+
+                  // ── Resultados de búsqueda ───────────
                   if (_searchResults.isNotEmpty)
                     Container(
                       margin: const EdgeInsets.only(top: 4),
                       decoration: BoxDecoration(
                         color: Colors.white,
                         borderRadius: BorderRadius.circular(12),
-                        boxShadow: const [
-                          BoxShadow(
-                              color: Colors.black26,
-                              blurRadius: 8,
-                              offset: Offset(0, 2))
-                        ],
+                        boxShadow: const [BoxShadow(color: Colors.black26, blurRadius: 8, offset: Offset(0, 2))],
                       ),
                       child: ListView.separated(
                         shrinkWrap: true,
@@ -1382,25 +984,21 @@ out center;
                         itemBuilder: (context, index) {
                           final place   = _searchResults[index];
                           final distKm  = place['distKm'] as double?;
-                          final distText = distKm != null
-                              ? distKm < 1
+                          final distText = distKm == null ? ''
+                              : distKm < 1
                                   ? '${(distKm * 1000).toStringAsFixed(0)} m'
-                                  : '${distKm.toStringAsFixed(1)} km'
-                              : '';
-
+                                  : '${distKm.toStringAsFixed(1)} km';
                           return ListTile(
                             leading: const Icon(Icons.location_on, color: Colors.blue),
                             title: Text(
                               place['short'] ?? place['name'],
-                              style: const TextStyle(
-                                  fontSize: 13, fontWeight: FontWeight.w600),
+                              style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600),
                               maxLines: 1,
                               overflow: TextOverflow.ellipsis,
                             ),
                             subtitle: Text(
                               place['name'],
-                              style: const TextStyle(
-                                  fontSize: 11, color: Colors.grey),
+                              style: const TextStyle(fontSize: 11, color: Colors.grey),
                               maxLines: 1,
                               overflow: TextOverflow.ellipsis,
                             ),
@@ -1410,94 +1008,65 @@ out center;
                                 if (distText.isNotEmpty)
                                   Container(
                                     margin: const EdgeInsets.only(right: 4),
-                                    padding: const EdgeInsets.symmetric(
-                                        horizontal: 6, vertical: 3),
+                                    padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 3),
                                     decoration: BoxDecoration(
-                                      color: Colors.blue[50],
-                                      borderRadius: BorderRadius.circular(8),
-                                    ),
-                                    child: Text(
-                                      distText,
-                                      style: TextStyle(
-                                          fontSize: 10,
-                                          color: Colors.blue[700],
-                                          fontWeight: FontWeight.w600),
-                                    ),
+                                        color: Colors.blue[50],
+                                        borderRadius: BorderRadius.circular(8)),
+                                    child: Text(distText,
+                                        style: TextStyle(
+                                            fontSize: 10,
+                                            color: Colors.blue[700],
+                                            fontWeight: FontWeight.w600)),
                                   ),
-                               IconButton(
-                                 icon: const Icon(
-                                     Icons.bookmark_add_outlined,
-                                     color: Colors.orange),
-                                 onPressed: () => _addPlaceToList(
-                                   PlaceItem(
-                                     name: place['name'],
-                                     lat:  place['lat'],
-                                     lng:  place['lng'],
-                                   ),
-                                 ),
-                               ),
-                             ],
-                           ),
-                           onTap: () => _goToPlace(
-                               place['lat'], place['lng'], place['name']),
-                         );
-                       },
-                     ),
-                   ),
+                                IconButton(
+                                  icon: const Icon(Icons.bookmark_add_outlined, color: Colors.orange),
+                                  onPressed: () => _addPlaceToList(PlaceItem(
+                                      name: place['name'], lat: place['lat'], lng: place['lng'])),
+                                ),
+                              ],
+                            ),
+                            onTap: () => _goToPlace(place['lat'], place['lng'], place['name']),
+                          );
+                        },
+                      ),
+                    ),
+                ],
+              ),
+            ),
+
           // ── Confirmar tap ────────────────────────────
           if (_showTapConfirm && !_navigating)
             Positioned(
-              bottom: 30,
-              left: 16,
-              right: 16,
+              bottom: 30, left: 16, right: 16,
               child: Container(
                 padding: const EdgeInsets.all(16),
                 decoration: BoxDecoration(
                   color: Colors.white,
                   borderRadius: BorderRadius.circular(16),
-                  boxShadow: const [
-                    BoxShadow(
-                        color: Colors.black26,
-                        blurRadius: 10,
-                        offset: Offset(0, 4))
-                  ],
+                  boxShadow: const [BoxShadow(color: Colors.black26, blurRadius: 10, offset: Offset(0, 4))],
                 ),
                 child: Column(
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    const Icon(Icons.location_on,
-                        color: Colors.red, size: 32),
+                    const Icon(Icons.location_on, color: Colors.red, size: 32),
                     const SizedBox(height: 8),
                     const Text('¿Ir a este lugar?',
-                        style: TextStyle(
-                            fontWeight: FontWeight.bold,
-                            fontSize: 16)),
+                        style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
                     const SizedBox(height: 4),
-                    Text(
-                      'Lat: ${_tappedLat?.toStringAsFixed(5)}'
-                      '  Lng: ${_tappedLng?.toStringAsFixed(5)}',
-                      style: const TextStyle(
-                          color: Colors.grey, fontSize: 12),
-                    ),
+                    Text('Lat: ${_tappedLat?.toStringAsFixed(5)}  Lng: ${_tappedLng?.toStringAsFixed(5)}',
+                        style: const TextStyle(color: Colors.grey, fontSize: 12)),
                     const SizedBox(height: 14),
                     Row(
                       children: [
                         Expanded(
                           child: OutlinedButton.icon(
                             onPressed: _cancelTap,
-                            icon: const Icon(Icons.close,
-                                color: Colors.red),
-                            label: const Text('Cancelar',
-                                style:
-                                    TextStyle(color: Colors.red)),
+                            icon: const Icon(Icons.close, color: Colors.red),
+                            label: const Text('Cancelar', style: TextStyle(color: Colors.red)),
                             style: OutlinedButton.styleFrom(
-                              side: const BorderSide(
-                                  color: Colors.red),
-                              padding: const EdgeInsets.symmetric(
-                                  vertical: 12),
-                              shape: RoundedRectangleBorder(
-                                  borderRadius:
-                                      BorderRadius.circular(10)),
+                              side: const BorderSide(color: Colors.red),
+                              padding: const EdgeInsets.symmetric(vertical: 12),
+                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
                             ),
                           ),
                         ),
@@ -1505,19 +1074,13 @@ out center;
                         Expanded(
                           child: ElevatedButton.icon(
                             onPressed: _confirmTappedDestination,
-                            icon: const Icon(Icons.directions,
-                                color: Colors.white),
+                            icon: const Icon(Icons.directions, color: Colors.white),
                             label: const Text('Trazar ruta',
-                                style: TextStyle(
-                                    color: Colors.white,
-                                    fontWeight: FontWeight.bold)),
+                                style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
                             style: ElevatedButton.styleFrom(
                               backgroundColor: Colors.blue[700],
-                              padding: const EdgeInsets.symmetric(
-                                  vertical: 12),
-                              shape: RoundedRectangleBorder(
-                                  borderRadius:
-                                      BorderRadius.circular(10)),
+                              padding: const EdgeInsets.symmetric(vertical: 12),
+                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
                             ),
                           ),
                         ),
@@ -1528,46 +1091,31 @@ out center;
               ),
             ),
 
-          // ── Panel de ruta ────────────────────────────
+          // ── Panel ruta ───────────────────────────────
           if (_routeDrawn && !_navigating && !_showTapConfirm)
             Positioned(
-              bottom: 30,
-              left: 16,
-              right: 16,
+              bottom: 30, left: 16, right: 16,
               child: Container(
                 padding: const EdgeInsets.all(16),
                 decoration: BoxDecoration(
                   color: Colors.white,
                   borderRadius: BorderRadius.circular(16),
-                  boxShadow: const [
-                    BoxShadow(
-                        color: Colors.black26,
-                        blurRadius: 10,
-                        offset: Offset(0, 4))
-                  ],
+                  boxShadow: const [BoxShadow(color: Colors.black26, blurRadius: 10, offset: Offset(0, 4))],
                 ),
                 child: Column(
                   mainAxisSize: MainAxisSize.min,
                   children: [
                     Text(_selectedPlace?['name'] ?? '',
-                        style: const TextStyle(
-                            fontWeight: FontWeight.bold,
-                            fontSize: 14),
-                        maxLines: 2,
-                        overflow: TextOverflow.ellipsis,
-                        textAlign: TextAlign.center),
+                        style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
+                        maxLines: 2, overflow: TextOverflow.ellipsis, textAlign: TextAlign.center),
                     const SizedBox(height: 8),
                     Row(
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: [
-                        const Icon(Icons.directions_bike,
-                            color: Colors.blue, size: 18),
+                        const Icon(Icons.directions_bike, color: Colors.blue, size: 18),
                         const SizedBox(width: 6),
-                        Text(
-                            '$_routeDistance  •  $_routeDuration',
-                            style: TextStyle(
-                                color: Colors.grey[700],
-                                fontSize: 14)),
+                        Text('$_routeDistance  •  $_routeDuration',
+                            style: TextStyle(color: Colors.grey[700], fontSize: 14)),
                       ],
                     ),
                     const SizedBox(height: 8),
@@ -1575,14 +1123,12 @@ out center;
                       onPressed: () {
                         if (_selectedPlace != null) {
                           _addPlaceToList(PlaceItem(
-                            name: _selectedPlace!['name'],
-                            lat:  _selectedPlace!['lat'],
-                            lng:  _selectedPlace!['lng'],
-                          ));
+                              name: _selectedPlace!['name'],
+                              lat:  _selectedPlace!['lat'],
+                              lng:  _selectedPlace!['lng']));
                         }
                       },
-                      icon: const Icon(Icons.bookmark_add_outlined,
-                          color: Colors.orange),
+                      icon: const Icon(Icons.bookmark_add_outlined, color: Colors.orange),
                       label: const Text('Guardar en lista',
                           style: TextStyle(color: Colors.orange)),
                     ),
@@ -1592,19 +1138,12 @@ out center;
                         Expanded(
                           child: OutlinedButton.icon(
                             onPressed: _cancelRoute,
-                            icon: const Icon(Icons.close,
-                                color: Colors.red),
-                            label: const Text('Cancelar',
-                                style:
-                                    TextStyle(color: Colors.red)),
+                            icon: const Icon(Icons.close, color: Colors.red),
+                            label: const Text('Cancelar', style: TextStyle(color: Colors.red)),
                             style: OutlinedButton.styleFrom(
-                              side: const BorderSide(
-                                  color: Colors.red),
-                              padding: const EdgeInsets.symmetric(
-                                  vertical: 12),
-                              shape: RoundedRectangleBorder(
-                                  borderRadius:
-                                      BorderRadius.circular(10)),
+                              side: const BorderSide(color: Colors.red),
+                              padding: const EdgeInsets.symmetric(vertical: 12),
+                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
                             ),
                           ),
                         ),
@@ -1612,20 +1151,13 @@ out center;
                         Expanded(
                           child: ElevatedButton.icon(
                             onPressed: _startNavigation,
-                            icon: const Icon(Icons.navigation,
-                                color: Colors.white),
+                            icon: const Icon(Icons.navigation, color: Colors.white),
                             label: const Text('¡Ir!',
-                                style: TextStyle(
-                                    color: Colors.white,
-                                    fontWeight: FontWeight.bold,
-                                    fontSize: 16)),
+                                style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 16)),
                             style: ElevatedButton.styleFrom(
                               backgroundColor: Colors.blue[700],
-                              padding: const EdgeInsets.symmetric(
-                                  vertical: 12),
-                              shape: RoundedRectangleBorder(
-                                  borderRadius:
-                                      BorderRadius.circular(10)),
+                              padding: const EdgeInsets.symmetric(vertical: 12),
+                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
                             ),
                           ),
                         ),
@@ -1639,9 +1171,7 @@ out center;
           // ── Panel navegando ──────────────────────────
           if (_navigating)
             Positioned(
-              bottom: 30,
-              left: 20,
-              right: 20,
+              bottom: 30, left: 20, right: 20,
               child: Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 crossAxisAlignment: CrossAxisAlignment.end,
@@ -1649,36 +1179,24 @@ out center;
                   Container(
                     padding: const EdgeInsets.all(15),
                     decoration: BoxDecoration(
-                      color: Colors.black87,
-                      borderRadius: BorderRadius.circular(15),
-                    ),
+                        color: Colors.black87, borderRadius: BorderRadius.circular(15)),
                     child: Column(
                       children: [
-                        Text(
-                          "${_currentSpeed.toStringAsFixed(0)}",
-                          style: const TextStyle(
-                              color: Colors.white,
-                              fontSize: 40,
-                              fontWeight: FontWeight.bold),
-                        ),
-                        const Text("km/h",
-                            style:
-                                TextStyle(color: Colors.white70)),
+                        Text('${_currentSpeed.toStringAsFixed(0)}',
+                            style: const TextStyle(
+                                color: Colors.white, fontSize: 40, fontWeight: FontWeight.bold)),
+                        const Text('km/h', style: TextStyle(color: Colors.white70)),
                       ],
                     ),
                   ),
                   ElevatedButton.icon(
                     onPressed: _cancelRoute,
-                    icon: const Icon(Icons.close,
-                        color: Colors.white),
-                    label: const Text('Salir',
-                        style: TextStyle(color: Colors.white)),
+                    icon: const Icon(Icons.close, color: Colors.white),
+                    label: const Text('Salir', style: TextStyle(color: Colors.white)),
                     style: ElevatedButton.styleFrom(
                       backgroundColor: Colors.red[700],
-                      padding: const EdgeInsets.symmetric(
-                          horizontal: 20, vertical: 12),
-                      shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(12)),
+                      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                     ),
                   ),
                 ],
@@ -1688,36 +1206,29 @@ out center;
           // ── Velocímetro modo libre ───────────────────
           if (!_navigating && !_routeDrawn && !_showTapConfirm)
             Positioned(
-              bottom: 30,
-              left: 20,
+              bottom: 30, left: 20,
               child: Container(
                 padding: const EdgeInsets.all(15),
                 decoration: BoxDecoration(
-                  color: Colors.black87,
-                  borderRadius: BorderRadius.circular(15),
-                ),
+                    color: Colors.black87, borderRadius: BorderRadius.circular(15)),
                 child: Column(
                   children: [
-                    Text(
-                      "${_currentSpeed.toStringAsFixed(0)}",
-                      style: const TextStyle(
-                          color: Colors.white,
-                          fontSize: 40,
-                          fontWeight: FontWeight.bold),
-                    ),
-                    const Text("km/h",
-                        style: TextStyle(color: Colors.white70)),
+                    Text('${_currentSpeed.toStringAsFixed(0)}',
+                        style: const TextStyle(
+                            color: Colors.white, fontSize: 40, fontWeight: FontWeight.bold)),
+                    const Text('km/h', style: TextStyle(color: Colors.white70)),
                   ],
                 ),
               ),
             ),
+
         ],
       ),
     );
   }
 }
 
-// ── Pantalla de lista ─────────────────────────────────────
+// ── PlaceListScreen ───────────────────────────────────────
 class PlaceListScreen extends StatefulWidget {
   final PlaceList placeList;
   final Function(PlaceItem) onNavigate;
@@ -1743,43 +1254,30 @@ class _PlaceListScreenState extends State<PlaceListScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: Text(
-            '${widget.placeList.emoji} ${widget.placeList.name}'),
+        title: Text('${widget.placeList.emoji} ${widget.placeList.name}'),
         backgroundColor: Colors.blue[700],
         foregroundColor: Colors.white,
         actions: [
-          IconButton(
-            icon: const Icon(Icons.share),
-            onPressed: widget.onShare,
-          ),
+          IconButton(icon: const Icon(Icons.share), onPressed: widget.onShare),
           IconButton(
             icon: const Icon(Icons.delete_outline),
-            onPressed: () {
-              showDialog(
-                context: context,
-                builder: (_) => AlertDialog(
-                  title: const Text('Eliminar lista'),
-                  content: Text(
-                      '¿Eliminar "${widget.placeList.name}"? Esta acción no se puede deshacer.'),
-                  actions: [
-                    TextButton(
+            onPressed: () => showDialog(
+              context: context,
+              builder: (_) => AlertDialog(
+                title: const Text('Eliminar lista'),
+                content: Text('¿Eliminar "${widget.placeList.name}"? Esta acción no se puede deshacer.'),
+                actions: [
+                  TextButton(
                       onPressed: () => Navigator.pop(context),
-                      child: const Text('Cancelar'),
-                    ),
-                    ElevatedButton(
-                      onPressed: () {
-                        Navigator.pop(context);
-                        widget.onDeleteList();
-                      },
-                      style: ElevatedButton.styleFrom(
-                          backgroundColor: Colors.red),
-                      child: const Text('Eliminar',
-                          style: TextStyle(color: Colors.white)),
-                    ),
-                  ],
-                ),
-              );
-            },
+                      child: const Text('Cancelar')),
+                  ElevatedButton(
+                    onPressed: () { Navigator.pop(context); widget.onDeleteList(); },
+                    style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
+                    child: const Text('Eliminar', style: TextStyle(color: Colors.white)),
+                  ),
+                ],
+              ),
+            ),
           ),
         ],
       ),
@@ -1791,33 +1289,25 @@ class _PlaceListScreenState extends State<PlaceListScreen> {
                   Text('📭', style: TextStyle(fontSize: 48)),
                   SizedBox(height: 12),
                   Text('No hay lugares en esta lista',
-                      style: TextStyle(
-                          color: Colors.grey, fontSize: 16)),
+                      style: TextStyle(color: Colors.grey, fontSize: 16)),
                   SizedBox(height: 8),
-                  Text(
-                    'Busca un lugar en el mapa y toca 🔖 para guardarlo aquí',
-                    style: TextStyle(
-                        color: Colors.grey, fontSize: 13),
-                    textAlign: TextAlign.center,
-                  ),
+                  Text('Busca un lugar en el mapa y toca 🔖 para guardarlo aquí',
+                      style: TextStyle(color: Colors.grey, fontSize: 13),
+                      textAlign: TextAlign.center),
                 ],
               ),
             )
           : ListView.separated(
               itemCount: widget.placeList.places.length,
-              separatorBuilder: (_, __) =>
-                  const Divider(height: 1),
+              separatorBuilder: (_, __) => const Divider(height: 1),
               itemBuilder: (_, i) {
                 final place = widget.placeList.places[i];
                 return ListTile(
                   leading: const CircleAvatar(
                     backgroundColor: Colors.blue,
-                    child: Icon(Icons.location_on,
-                        color: Colors.white, size: 18),
+                    child: Icon(Icons.location_on, color: Colors.white, size: 18),
                   ),
-                  title: Text(place.name,
-                      maxLines: 2,
-                      overflow: TextOverflow.ellipsis),
+                  title: Text(place.name, maxLines: 2, overflow: TextOverflow.ellipsis),
                   subtitle: Text(
                     '${place.lat.toStringAsFixed(4)}, ${place.lng.toStringAsFixed(4)}',
                     style: const TextStyle(fontSize: 11),
@@ -1826,19 +1316,11 @@ class _PlaceListScreenState extends State<PlaceListScreen> {
                     mainAxisSize: MainAxisSize.min,
                     children: [
                       IconButton(
-                        icon: const Icon(Icons.navigation,
-                            color: Colors.blue),
-                        onPressed: () =>
-                            widget.onNavigate(place),
-                      ),
+                          icon: const Icon(Icons.navigation, color: Colors.blue),
+                          onPressed: () => widget.onNavigate(place)),
                       IconButton(
-                        icon: const Icon(Icons.delete_outline,
-                            color: Colors.red),
-                        onPressed: () {
-                          setState(
-                              () => widget.onDelete(place));
-                        },
-                      ),
+                          icon: const Icon(Icons.delete_outline, color: Colors.red),
+                          onPressed: () => setState(() => widget.onDelete(place))),
                     ],
                   ),
                 );
