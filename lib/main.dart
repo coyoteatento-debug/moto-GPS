@@ -140,11 +140,11 @@ class _MotoGPSAppState extends State<MotoGPSApp> {
     // ✅ Redimensiona para evitar íconos gigantes
     final Uint8List pinResized  = await _resizeImage(
       pinData.buffer.asUint8List(),
-      80,   // px — pin de destino
+      120,   // px — pin de destino
     );
     final Uint8List motoResized = await _resizeImage(
       motoData.buffer.asUint8List(),
-      60,   // px — ícono de moto
+      100,   // px — ícono de moto
     );
 
     setState(() {
@@ -555,7 +555,7 @@ class _MotoGPSAppState extends State<MotoGPSApp> {
           geometry: mapbox.Point(
               coordinates: mapbox.Position(lng, lat)),
           image: motoImage,
-          iconSize: 1.0,                          // ✅ tamaño real del resize
+          iconSize: 1.2,                          // ✅ tamaño real del resize
           iconAnchor: mapbox.IconAnchor.CENTER,
           iconRotate: bearing,                    // ✅ rotación
         ),
@@ -758,7 +758,7 @@ class _MotoGPSAppState extends State<MotoGPSApp> {
           coordinates: mapbox.Position(lng, lat),
         ),
         image: pinImage,                          // ✅ imagen cacheada
-        iconSize: 1.0,                            // ✅ tamaño real del resize
+        iconSize: 1.2,                            // ✅ tamaño real del resize
         iconAnchor: mapbox.IconAnchor.BOTTOM,
       ),
     );
