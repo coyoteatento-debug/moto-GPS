@@ -8,7 +8,7 @@ import 'package:url_launcher/url_launcher.dart';
 import 'dart:typed_data';
 import 'dart:convert';
 import 'dart:math';
-import 'dart:async';                          // ✅ AGREGADO
+import 'dart:async';
 import 'package:http/http.dart' as http;
 import 'dart:ui' as ui;
 
@@ -21,7 +21,6 @@ void main() async {
   runApp(const MaterialApp(home: MotoGPSApp()));
 }
 
-// ✅ Modelo de lugar
 class PlaceItem {
   final String name;
   final double lat;
@@ -34,7 +33,6 @@ class PlaceItem {
       PlaceItem(name: j['name'], lat: j['lat'], lng: j['lng']);
 }
 
-// ✅ Modelo de lista
 class PlaceList {
   String id;
   String name;
@@ -72,15 +70,18 @@ class MotoGPSApp extends StatefulWidget {
 }
 
 class _MotoGPSAppState extends State<MotoGPSApp> {
+
+  // ── Mapa ──────────────────────────────────────────────
   mapbox.MapboxMap? mapboxMap;
   mapbox.PointAnnotationManager? annotationManager;
   mapbox.PointAnnotation? motoAnnotation;
   mapbox.PointAnnotation? destinationAnnotation;
 
-  // ✅ DECLARADAS — imágenes cacheadas en memoria
-  Uint8List? pinImage;    // marcador de destino  (moto_pin.png)
-  Uint8List? motoImage;   // ícono de posición    (moto.png)
+  // ── Imágenes cacheadas ────────────────────────────────
+  Uint8List? pinImage;    // ✅ marcador de destino
+  Uint8List? motoImage;   // ✅ ícono de posición actual
 
+  // ── Estado general ────────────────────────────────────
   double _currentSpeed = 0.0;
   Position? _currentPosition;
 
@@ -99,14 +100,15 @@ class _MotoGPSAppState extends State<MotoGPSApp> {
 
   List<List<double>> _routeCoordinates = [];
 
+  // ── Listas de lugares ─────────────────────────────────
   List<PlaceList> _placeLists = [];
   final GlobalKey<ScaffoldState> _scaffoldKey = GlobalKey<ScaffoldState>();
 
-  // ── Lifecycle ─────────────────────────────────────
+  // ─────────────────────────────────────────────────────
   @override
   void initState() {
     super.initState();
-    _loadImages();           // ✅ carga ambos PNGs una sola vez
+    _loadImages();        // ✅ carga y redimensiona los PNGs
     _requestPermissions();
     _loadLists();
   }
@@ -117,17 +119,41 @@ class _MotoGPSAppState extends State<MotoGPSApp> {
     super.dispose();
   }
 
-  // ✅ Carga ambas imágenes una sola vez al iniciar
+  // ── Redimensiona imagen a targetWidth px ──────────────
+  Future<Uint8List> _resizeImage(Uint8List data, int targetWidth) async {
+    final codec = await ui.instantiateImageCodec(
+      data,
+      targetWidth: targetWidth,
+    );
+    final frame = await codec.getNextFrame();
+    final byteData = await frame.image.toByteData(
+      format: ui.ImageByteFormat.png,
+    );
+    return byteData!.buffer.asUint8List();
+  }
+
+  // ── Carga ambas imágenes una sola vez ─────────────────
   Future<void> _loadImages() async {
     final ByteData pinData  = await rootBundle.load('assets/moto_pin.png');
     final ByteData motoData = await rootBundle.load('assets/moto.png');
+
+    // ✅ Redimensiona para evitar íconos gigantes
+    final Uint8List pinResized  = await _resizeImage(
+      pinData.buffer.asUint8List(),
+      80,   // px — pin de destino
+    );
+    final Uint8List motoResized = await _resizeImage(
+      motoData.buffer.asUint8List(),
+      60,   // px — ícono de moto
+    );
+
     setState(() {
-      pinImage  = pinData.buffer.asUint8List();
-      motoImage = motoData.buffer.asUint8List();
+      pinImage  = pinResized;
+      motoImage = motoResized;
     });
   }
 
-  // ── Listas ────────────────────────────────────────
+  // ── Listas ────────────────────────────────────────────
   Future<void> _loadLists() async {
     final prefs = await SharedPreferences.getInstance();
     final raw = prefs.getString('place_lists');
@@ -150,7 +176,7 @@ class _MotoGPSAppState extends State<MotoGPSApp> {
   void _createList() {
     final nameController = TextEditingController();
     String selectedEmoji = '📍';
-    final emojis = ['📍', '⛽', '🍽️', '🏨', '🏍️', '🌄', '🔧', '🎯', '⭐', '🗺️'];
+    final emojis = ['📍','⛽','🍽️','🏨','🏍️','🌄','🔧','🎯','⭐','🗺️'];
 
     showDialog(
       context: context,
@@ -243,16 +269,19 @@ class _MotoGPSAppState extends State<MotoGPSApp> {
             itemBuilder: (_, i) {
               final list = _placeLists[i];
               return ListTile(
-                leading: Text(list.emoji, style: const TextStyle(fontSize: 24)),
+                leading: Text(list.emoji,
+                    style: const TextStyle(fontSize: 24)),
                 title: Text(list.name),
                 subtitle: Text('${list.places.length} lugares'),
                 onTap: () {
-                  final exists = list.places.any((p) => p.name == place.name);
+                  final exists =
+                      list.places.any((p) => p.name == place.name);
                   if (exists) {
                     Navigator.pop(ctx);
                     ScaffoldMessenger.of(context).showSnackBar(
                       const SnackBar(
-                          content: Text('Este lugar ya está en la lista')),
+                          content:
+                              Text('Este lugar ya está en la lista')),
                     );
                     return;
                   }
@@ -260,7 +289,8 @@ class _MotoGPSAppState extends State<MotoGPSApp> {
                   _saveLists();
                   Navigator.pop(ctx);
                   ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(content: Text('✅ Agregado a "${list.name}"')),
+                    SnackBar(
+                        content: Text('✅ Agregado a "${list.name}"')),
                   );
                 },
               );
@@ -310,10 +340,8 @@ class _MotoGPSAppState extends State<MotoGPSApp> {
       buffer.writeln(
           'https://maps.google.com/?q=${place.lat},${place.lng}\n');
     }
-
     final encoded = Uri.encodeComponent(buffer.toString());
     final uri = Uri.parse('https://wa.me/?text=$encoded');
-
     if (await canLaunchUrl(uri)) {
       await launchUrl(uri, mode: LaunchMode.externalApplication);
     } else {
@@ -327,7 +355,7 @@ class _MotoGPSAppState extends State<MotoGPSApp> {
     }
   }
 
-  // ── Permisos ──────────────────────────────────────
+  // ── Permisos ──────────────────────────────────────────
   Future<void> _requestPermissions() async {
     final status = await Permission.locationWhenInUse.request();
     if (status.isGranted) {
@@ -337,21 +365,21 @@ class _MotoGPSAppState extends State<MotoGPSApp> {
     }
   }
 
-  // ── Zoom dinámico ─────────────────────────────────
+  // ── Zoom dinámico ─────────────────────────────────────
   double _calculateDynamicZoom(double speed) {
     if (speed < 20) return 16.0;
     if (speed < 80) return 14.0;
     return 12.0;
   }
 
-  // ── Mapa listo ────────────────────────────────────
+  // ── Mapa listo ────────────────────────────────────────
   Future<void> _onMapCreated(mapbox.MapboxMap map) async {
     mapboxMap = map;
     annotationManager =
         await map.annotations.createPointAnnotationManager();
   }
 
-  // ── Utilidades de ruta ────────────────────────────
+  // ── Utilidades de ruta ────────────────────────────────
   double _distanceBetween(
       double lat1, double lng1, double lat2, double lng2) {
     const R = 6371000.0;
@@ -450,20 +478,17 @@ class _MotoGPSAppState extends State<MotoGPSApp> {
     } catch (_) {}
   }
 
-  // ── Tap en mapa ───────────────────────────────────
+  // ── Tap en mapa ───────────────────────────────────────
   void _onMapTap(mapbox.MapContentGestureContext context) {
     if (_navigating) return;
-
     final lat = context.point.coordinates.lat.toDouble();
     final lng = context.point.coordinates.lng.toDouble();
-
     setState(() {
       _tappedLat = lat;
       _tappedLng = lng;
       _showTapConfirm = true;
       _searchResults = [];
     });
-
     _addDestinationMarker(lat, lng);
     mapboxMap?.flyTo(
       mapbox.CameraOptions(
@@ -518,38 +543,38 @@ class _MotoGPSAppState extends State<MotoGPSApp> {
     });
   }
 
-  // ── Marcador de moto — usa imagen cacheada ────────
+  // ── Marcador de moto — imagen cacheada + rotación ─────
   Future<void> _updateMotoMarker(
       double lat, double lng, double bearing) async {
-    if (annotationManager == null || motoImage == null) return;  // ✅ usa cache
+    if (annotationManager == null || motoImage == null) return;
 
     if (motoAnnotation == null) {
-      // Primera vez: crear la anotación
+      // Primera vez: crear
       motoAnnotation = await annotationManager!.create(
         mapbox.PointAnnotationOptions(
           geometry: mapbox.Point(
               coordinates: mapbox.Position(lng, lat)),
-          image: motoImage,        // ✅ imagen cacheada
-          iconSize: 0.5,
+          image: motoImage,
+          iconSize: 1.0,                          // ✅ tamaño real del resize
           iconAnchor: mapbox.IconAnchor.CENTER,
-          iconRotate: bearing,    // ✅ rotación inicial
+          iconRotate: bearing,                    // ✅ rotación
         ),
       );
     } else {
-      // Actualizaciones siguientes: solo mover y rotar
+      // Siguientes: solo actualizar posición y rotación
       motoAnnotation!.geometry =
           mapbox.Point(coordinates: mapbox.Position(lng, lat));
-      motoAnnotation!.iconRotate = bearing;   // ✅ rota en tiempo real
+      motoAnnotation!.iconRotate = bearing;       // ✅ rota en tiempo real
       await annotationManager!.update(motoAnnotation!);
     }
   }
 
-  // ── Tracking GPS ──────────────────────────────────
+  // ── Tracking GPS ──────────────────────────────────────
   void _startLocationTracking() {
     Geolocator.getPositionStream(
       locationSettings: const LocationSettings(
-        accuracy: LocationAccuracy.bestForNavigation,  // ✅ máxima precisión
-        distanceFilter: 2,                             // ✅ cada 2 metros
+        accuracy: LocationAccuracy.bestForNavigation,
+        distanceFilter: 2,
       ),
     ).listen((Position position) {
       if (!mounted) return;
@@ -564,8 +589,8 @@ class _MotoGPSAppState extends State<MotoGPSApp> {
             _snapToRoute(position.latitude, position.longitude);
         final snappedLng = snapped[0];
         final snappedLat = snapped[1];
-        final closestIdx =
-            _findClosestPointIndex(position.latitude, position.longitude);
+        final closestIdx = _findClosestPointIndex(
+            position.latitude, position.longitude);
 
         double routeBearing = position.heading;
         if (closestIdx < _routeCoordinates.length - 1) {
@@ -581,7 +606,8 @@ class _MotoGPSAppState extends State<MotoGPSApp> {
         mapboxMap?.flyTo(
           mapbox.CameraOptions(
             center: mapbox.Point(
-                coordinates: mapbox.Position(snappedLng, snappedLat)),
+                coordinates:
+                    mapbox.Position(snappedLng, snappedLat)),
             zoom: 17.0,
             bearing: routeBearing,
             pitch: 50.0,
@@ -591,7 +617,6 @@ class _MotoGPSAppState extends State<MotoGPSApp> {
       } else {
         _updateMotoMarker(
             position.latitude, position.longitude, position.heading);
-
         if (!_routeDrawn && !_showTapConfirm) {
           mapboxMap?.setCamera(mapbox.CameraOptions(
             center: mapbox.Point(
@@ -605,7 +630,7 @@ class _MotoGPSAppState extends State<MotoGPSApp> {
     });
   }
 
-  // ── Búsqueda de lugares ───────────────────────────
+  // ── Búsqueda ──────────────────────────────────────────
   Future<void> _searchPlaces(String query) async {
     if (query.isEmpty) {
       setState(() => _searchResults = []);
@@ -632,7 +657,7 @@ class _MotoGPSAppState extends State<MotoGPSApp> {
     }
   }
 
-  // ── Ruta ──────────────────────────────────────────
+  // ── Ruta ──────────────────────────────────────────────
   Future<void> _getRoute(double destLat, double destLng) async {
     if (_currentPosition == null) return;
     final url = Uri.parse(
@@ -656,9 +681,9 @@ class _MotoGPSAppState extends State<MotoGPSApp> {
           .map((c) => [c[0] as double, c[1] as double])
           .toList();
       setState(() {
-        _routeDistance   = '$distanceKm km';
-        _routeDuration   = '$durationMin min';
-        _routeDrawn      = true;
+        _routeDistance    = '$distanceKm km';
+        _routeDuration    = '$durationMin min';
+        _routeDrawn       = true;
         _routeCoordinates = coords;
       });
       await _drawRouteOnMap(geometry);
@@ -707,12 +732,12 @@ class _MotoGPSAppState extends State<MotoGPSApp> {
   void _goToPlace(double lat, double lng, String name) async {
     Navigator.of(context).popUntil((route) => route.isFirst);
     setState(() {
-      _searchResults   = [];
+      _searchResults    = [];
       _searchController.text = name;
-      _selectedPlace   = {'name': name, 'lat': lat, 'lng': lng};
-      _routeDrawn      = false;
-      _navigating      = false;
-      _showTapConfirm  = false;
+      _selectedPlace    = {'name': name, 'lat': lat, 'lng': lng};
+      _routeDrawn       = false;
+      _navigating       = false;
+      _showTapConfirm   = false;
       _routeCoordinates = [];
     });
     FocusScope.of(context).unfocus();
@@ -720,22 +745,20 @@ class _MotoGPSAppState extends State<MotoGPSApp> {
     await _getRoute(lat, lng);
   }
 
-  // ── Marcador de destino — usa imagen cacheada ─────
+  // ── Marcador de destino — imagen cacheada ─────────────
   Future<void> _addDestinationMarker(double lat, double lng) async {
     if (annotationManager == null) return;
-
     if (destinationAnnotation != null) {
       await annotationManager!.delete(destinationAnnotation!);
       destinationAnnotation = null;
     }
-
     destinationAnnotation = await annotationManager!.create(
       mapbox.PointAnnotationOptions(
         geometry: mapbox.Point(
           coordinates: mapbox.Position(lng, lat),
         ),
-        image: pinImage,                     // ✅ imagen cacheada
-        iconSize: 0.6,
+        image: pinImage,                          // ✅ imagen cacheada
+        iconSize: 1.0,                            // ✅ tamaño real del resize
         iconAnchor: mapbox.IconAnchor.BOTTOM,
       ),
     );
@@ -785,7 +808,7 @@ class _MotoGPSAppState extends State<MotoGPSApp> {
     }
   }
 
-  // ── UI ────────────────────────────────────────────
+  // ── UI ────────────────────────────────────────────────
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -810,8 +833,8 @@ class _MotoGPSAppState extends State<MotoGPSApp> {
                         )),
                     SizedBox(height: 4),
                     Text('Mis listas de lugares',
-                        style:
-                            TextStyle(color: Colors.white70, fontSize: 14)),
+                        style: TextStyle(
+                            color: Colors.white70, fontSize: 14)),
                   ],
                 ),
               ),
@@ -904,6 +927,7 @@ class _MotoGPSAppState extends State<MotoGPSApp> {
             ),
           ),
 
+          // Botón menú
           if (!_navigating)
             Positioned(
               top: 50,
@@ -923,12 +947,12 @@ class _MotoGPSAppState extends State<MotoGPSApp> {
                           offset: Offset(0, 2))
                     ],
                   ),
-                  child:
-                      const Icon(Icons.menu, color: Colors.black87),
+                  child: const Icon(Icons.menu, color: Colors.black87),
                 ),
               ),
             ),
 
+          // Barra de búsqueda
           if (!_navigating)
             Positioned(
               top: 50,
@@ -952,8 +976,7 @@ class _MotoGPSAppState extends State<MotoGPSApp> {
                       onChanged: _searchPlaces,
                       decoration: InputDecoration(
                         hintText: '🔍  Buscar lugar...',
-                        hintStyle:
-                            const TextStyle(color: Colors.grey),
+                        hintStyle: const TextStyle(color: Colors.grey),
                         border: InputBorder.none,
                         contentPadding: const EdgeInsets.symmetric(
                             horizontal: 16, vertical: 14),
@@ -993,8 +1016,7 @@ class _MotoGPSAppState extends State<MotoGPSApp> {
                             leading: const Icon(Icons.location_on,
                                 color: Colors.blue),
                             title: Text(place['name'],
-                                style:
-                                    const TextStyle(fontSize: 13),
+                                style: const TextStyle(fontSize: 13),
                                 maxLines: 2,
                                 overflow: TextOverflow.ellipsis),
                             trailing: IconButton(
@@ -1021,6 +1043,7 @@ class _MotoGPSAppState extends State<MotoGPSApp> {
               ),
             ),
 
+          // Confirmar tap
           if (_showTapConfirm && !_navigating)
             Positioned(
               bottom: 30,
@@ -1046,8 +1069,7 @@ class _MotoGPSAppState extends State<MotoGPSApp> {
                     const SizedBox(height: 8),
                     const Text('¿Ir a este lugar?',
                         style: TextStyle(
-                            fontWeight: FontWeight.bold,
-                            fontSize: 16)),
+                            fontWeight: FontWeight.bold, fontSize: 16)),
                     const SizedBox(height: 4),
                     Text(
                       'Lat: ${_tappedLat?.toStringAsFixed(5)}'
@@ -1064,11 +1086,10 @@ class _MotoGPSAppState extends State<MotoGPSApp> {
                             icon: const Icon(Icons.close,
                                 color: Colors.red),
                             label: const Text('Cancelar',
-                                style:
-                                    TextStyle(color: Colors.red)),
+                                style: TextStyle(color: Colors.red)),
                             style: OutlinedButton.styleFrom(
-                              side: const BorderSide(
-                                  color: Colors.red),
+                              side:
+                                  const BorderSide(color: Colors.red),
                               padding: const EdgeInsets.symmetric(
                                   vertical: 12),
                               shape: RoundedRectangleBorder(
@@ -1104,6 +1125,7 @@ class _MotoGPSAppState extends State<MotoGPSApp> {
               ),
             ),
 
+          // Panel de ruta
           if (_routeDrawn && !_navigating && !_showTapConfirm)
             Positioned(
               bottom: 30,
@@ -1126,8 +1148,7 @@ class _MotoGPSAppState extends State<MotoGPSApp> {
                   children: [
                     Text(_selectedPlace?['name'] ?? '',
                         style: const TextStyle(
-                            fontWeight: FontWeight.bold,
-                            fontSize: 14),
+                            fontWeight: FontWeight.bold, fontSize: 14),
                         maxLines: 2,
                         overflow: TextOverflow.ellipsis,
                         textAlign: TextAlign.center),
@@ -1138,11 +1159,9 @@ class _MotoGPSAppState extends State<MotoGPSApp> {
                         const Icon(Icons.directions_bike,
                             color: Colors.blue, size: 18),
                         const SizedBox(width: 6),
-                        Text(
-                            '$_routeDistance  •  $_routeDuration',
+                        Text('$_routeDistance  •  $_routeDuration',
                             style: TextStyle(
-                                color: Colors.grey[700],
-                                fontSize: 14)),
+                                color: Colors.grey[700], fontSize: 14)),
                       ],
                     ),
                     const SizedBox(height: 8),
@@ -1156,12 +1175,10 @@ class _MotoGPSAppState extends State<MotoGPSApp> {
                           ));
                         }
                       },
-                      icon: const Icon(
-                          Icons.bookmark_add_outlined,
+                      icon: const Icon(Icons.bookmark_add_outlined,
                           color: Colors.orange),
                       label: const Text('Guardar en lista',
-                          style:
-                              TextStyle(color: Colors.orange)),
+                          style: TextStyle(color: Colors.orange)),
                     ),
                     const SizedBox(height: 6),
                     Row(
@@ -1172,11 +1189,10 @@ class _MotoGPSAppState extends State<MotoGPSApp> {
                             icon: const Icon(Icons.close,
                                 color: Colors.red),
                             label: const Text('Cancelar',
-                                style: TextStyle(
-                                    color: Colors.red)),
+                                style: TextStyle(color: Colors.red)),
                             style: OutlinedButton.styleFrom(
-                              side: const BorderSide(
-                                  color: Colors.red),
+                              side:
+                                  const BorderSide(color: Colors.red),
                               padding: const EdgeInsets.symmetric(
                                   vertical: 12),
                               shape: RoundedRectangleBorder(
@@ -1213,6 +1229,7 @@ class _MotoGPSAppState extends State<MotoGPSApp> {
               ),
             ),
 
+          // Panel navegando
           if (_navigating)
             Positioned(
               bottom: 30,
@@ -1238,15 +1255,13 @@ class _MotoGPSAppState extends State<MotoGPSApp> {
                               fontWeight: FontWeight.bold),
                         ),
                         const Text("km/h",
-                            style:
-                                TextStyle(color: Colors.white70)),
+                            style: TextStyle(color: Colors.white70)),
                       ],
                     ),
                   ),
                   ElevatedButton.icon(
                     onPressed: _cancelRoute,
-                    icon: const Icon(Icons.close,
-                        color: Colors.white),
+                    icon: const Icon(Icons.close, color: Colors.white),
                     label: const Text('Salir',
                         style: TextStyle(color: Colors.white)),
                     style: ElevatedButton.styleFrom(
@@ -1261,6 +1276,7 @@ class _MotoGPSAppState extends State<MotoGPSApp> {
               ),
             ),
 
+          // Velocímetro modo libre
           if (!_navigating && !_routeDrawn && !_showTapConfirm)
             Positioned(
               bottom: 30,
@@ -1292,7 +1308,7 @@ class _MotoGPSAppState extends State<MotoGPSApp> {
   }
 }
 
-// ── Pantalla de detalle de lista ──────────────────────
+// ── Pantalla de lista ─────────────────────────────────────
 class PlaceListScreen extends StatefulWidget {
   final PlaceList placeList;
   final Function(PlaceItem) onNavigate;
@@ -1366,13 +1382,13 @@ class _PlaceListScreenState extends State<PlaceListScreen> {
                   Text('📭', style: TextStyle(fontSize: 48)),
                   SizedBox(height: 12),
                   Text('No hay lugares en esta lista',
-                      style: TextStyle(
-                          color: Colors.grey, fontSize: 16)),
+                      style:
+                          TextStyle(color: Colors.grey, fontSize: 16)),
                   SizedBox(height: 8),
                   Text(
                     'Busca un lugar en el mapa y toca 🔖 para guardarlo aquí',
-                    style: TextStyle(
-                        color: Colors.grey, fontSize: 13),
+                    style:
+                        TextStyle(color: Colors.grey, fontSize: 13),
                     textAlign: TextAlign.center,
                   ),
                 ],
@@ -1380,8 +1396,7 @@ class _PlaceListScreenState extends State<PlaceListScreen> {
             )
           : ListView.separated(
               itemCount: widget.placeList.places.length,
-              separatorBuilder: (_, __) =>
-                  const Divider(height: 1),
+              separatorBuilder: (_, __) => const Divider(height: 1),
               itemBuilder: (_, i) {
                 final place = widget.placeList.places[i];
                 return ListTile(
@@ -1403,15 +1418,13 @@ class _PlaceListScreenState extends State<PlaceListScreen> {
                       IconButton(
                         icon: const Icon(Icons.navigation,
                             color: Colors.blue),
-                        onPressed: () =>
-                            widget.onNavigate(place),
+                        onPressed: () => widget.onNavigate(place),
                       ),
                       IconButton(
                         icon: const Icon(Icons.delete_outline,
                             color: Colors.red),
                         onPressed: () {
-                          setState(
-                              () => widget.onDelete(place));
+                          setState(() => widget.onDelete(place));
                         },
                       ),
                     ],
