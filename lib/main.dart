@@ -695,12 +695,17 @@ class _MotoGPSAppState extends State<MotoGPSApp> {
       final catElements = byCategory[catId]!;
 
       final features = catElements.map((e) {
-        final pLat = e['type'] == 'node'
-            ? e['lat'] as double
-            : (e['center']?['lat'] as double? ?? 0.0);
-        final pLng = e['type'] == 'node'
-            ? e['lon'] as double
-            : (e['center']?['lon'] as double? ?? 0.0);
+        final element = e as Map<String, dynamic>; // Agregamos este cast
+        
+        // Usamos 'as num' para que acepte int o double sin romper
+        final pLat = element['type'] == 'node'
+            ? (element['lat'] as num).toDouble()
+            : ((element['center'] as Map<String, dynamic>?)?['lat'] as num? ?? 0.0).toDouble();
+            
+        final pLng = element['type'] == 'node'
+            ? (element['lon'] as num).toDouble()
+            : ((element['center'] as Map<String, dynamic>?)?['lon'] as num? ?? 0.0).toDouble();
+
         return {
           'type': 'Feature',
           'geometry': {
@@ -708,8 +713,7 @@ class _MotoGPSAppState extends State<MotoGPSApp> {
             'coordinates': [pLng, pLat],
           },
           'properties': {
-            'name':
-                (e['tags']?['name'] as String?) ?? (cat['label'] as String),
+            'name': (element['tags'] as Map<String, dynamic>?)?['name']?.toString() ?? (cat['label'] as String),
             'category': catId,
             'label': cat['label'],
             'emoji': cat['emoji'],
@@ -726,18 +730,24 @@ class _MotoGPSAppState extends State<MotoGPSApp> {
 
       cacheEntry['$cacheKey-$catId'] = geoJson;
 
-      // NUEVO: Guardar coordenadas en memoria para detección de tap
-      _poiData[catId] = features
-          .map((f) => {
-                'lat': (f['geometry']['coordinates'][1] as double),
-                'lng': (f['geometry']['coordinates'][0] as double),
-                'name': f['properties']['name'],
-                'category': catId,
-                'label': cat['label'],
-                'emoji': cat['emoji'],
-                'color': cat['color'],
-              })
-          .toList();
+      // Actualización de caché y datos de tap
+      _poiData[catId] = features.map((f) {
+        // IMPORTANTE: f es 'Object?', debemos decirle a Dart que es un Mapa
+        final feature = f as Map<String, dynamic>;
+        final geometry = feature['geometry'] as Map<String, dynamic>;
+        final coords = geometry['coordinates'] as List<dynamic>;
+        final props = feature['properties'] as Map<String, dynamic>;
+
+        return {
+          'lat': (coords[1] as num).toDouble(),
+          'lng': (coords[0] as num).toDouble(),
+          'name': props['name'],
+          'category': catId,
+          'label': props['label'],
+          'emoji': props['emoji'],
+          'color': cat['color'],
+        };
+      }).toList();
 
       await _updatePoiLayer(
         sourceId: 'poi-$catId-source',
