@@ -728,16 +728,23 @@ class _MotoGPSAppState extends State<MotoGPSApp> {
 
       // NUEVO: Guardar coordenadas en memoria para detección de tap
       _poiData[catId] = features
-          .map((f) => {
-                'lat': (f['geometry']['coordinates'][1] as double),
-                'lng': (f['geometry']['coordinates'][0] as double),
-                'name': f['properties']['name'],
-                'category': catId,
-                'label': cat['label'],
-                'emoji': cat['emoji'],
-                'color': cat['color'],
-              })
-          .toList();
+           .map((f) {
+             final feat = f as Map<String, dynamic>;
+             final geometry = feat['geometry'] as Map<String, dynamic>;
+             final coordinates = geometry['coordinates'] as List<dynamic>;
+             final properties = feat['properties'] as Map<String, dynamic>;
+
+             return {
+               'lat': coordinates[1] as double,
+               'lng': coordinates[0] as double,
+               'name': properties['name'] as String,
+               'category': catId,
+               'label': cat['label'],
+               'emoji': cat['emoji'],
+               'color': cat['color'],
+             };
+           })
+           .toList();
 
       await _updatePoiLayer(
         sourceId: 'poi-$catId-source',
@@ -758,7 +765,7 @@ class _MotoGPSAppState extends State<MotoGPSApp> {
 
   // ── NUEVO: Renderizar POIs desde caché ────────────────────────────────────
   Future<void> _renderCachedPOIs(String cacheKey) async {
-    for (final cat in _poiCategories) {
+    for (final cat in _poiCategories.cast<Map<String, dynamic>>()) {
       final catId = cat['id'] as String;
       final cached = _poiGeoJsonCache['$cacheKey-$catId'];
       if (cached != null) {
