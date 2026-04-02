@@ -74,6 +74,7 @@ class _MotoGPSAppState extends State<MotoGPSApp> {
   Uint8List? motoImage;
 
   double _currentSpeed = 0.0;
+  Timer? _poiDebounce;
   Position? _currentPosition;
 
   final TextEditingController _searchController = TextEditingController();
@@ -786,38 +787,44 @@ class _MotoGPSAppState extends State<MotoGPSApp> {
   // FIX #1: iconImage ahora usa 'poi-xxx' (íconos registrados por nosotros).
   // FIX #2: iconAllowOverlap: true — antes 'false' ocultaba muchos POIs.
   Future<void> _updatePoiLayer({
-    required String sourceId,
-    required String layerId,
-    required String iconName,
-    required String geoJson,
-  }) async {
-    if (mapboxMap == null) return;
-    try {
-      final style = await mapboxMap!.style;
-      try { await style.removeStyleLayer(layerId);  } catch (_) {}
-      try { await style.removeStyleSource(sourceId); } catch (_) {}
+  required String sourceId, 
+  required String layerId, 
+  required String iconName, 
+  required String geoJson
+}) async {
+  if (mapboxMap == null) return;
+  try {
+    final style = await mapboxMap!.style;
+    final exists = await style.styleSourceExists(sourceId);
+
+    if (exists) {
+      // ESTA ES LA CLAVE: Si ya existe, actualiza los datos en lugar de borrar la capa
+      final source = await style.getSource(sourceId);
+      if (source is mapbox.GeoJsonSource) {
+        await source.updateGeoJson(geoJson); 
+      }
+    } else {
+      // Solo si no existe (al iniciar la app) se crea desde cero
       await style.addSource(mapbox.GeoJsonSource(id: sourceId, data: geoJson));
       await style.addLayer(mapbox.SymbolLayer(
         id: layerId,
         sourceId: sourceId,
-        iconImage: iconName,          // Ícono personalizado registrado
-        iconSize: 0.75,               // 64px * 0.75 = 48px lógicos
-        iconAllowOverlap: true,       // FIX #2: mostrar todos los íconos
-        iconIgnorePlacement: false,
+        iconImage: iconName,
+        iconSize: 0.75,
+        iconAllowOverlap: true,
         textField: '{name}',
         textSize: 10.5,
         textOffset: [0.0, 2.4],
-        textAllowOverlap: false,
-        textOptional: true,           // Ocultar texto si hay colisión (no el ícono)
         textColor: 0xFF1A1A1A,
-        textHaloColor: 0xFFFFFFFF,    // Halo blanco para legibilidad
+        textHaloColor: 0xFFFFFFFF,
         textHaloWidth: 1.5,
+        textOptional: true,
       ));
-    } catch (e) {
-      debugPrint('[POI Layer] Error actualizando capa $layerId: $e');
     }
+  } catch (e) {
+    debugPrint("Error en capa POI: $e");
   }
-
+}
   Future<void> _clearPOIs() async {
     if (mapboxMap == null) return;
     try {
@@ -1320,12 +1327,21 @@ class _MotoGPSAppState extends State<MotoGPSApp> {
               onTapListener: _onMapTap,
               cameraOptions: mapbox.CameraOptions(zoom: 15.0, pitch: 0.0),
               onCameraChangeListener: (state) async {
-                if (_poisVisible && !_poiLoading) {
+            // 1. Cancelamos cualquier carga de POIs que estuviera en espera
+            _poiDebounce?.cancel();
+
+            // 2. Iniciamos un cronómetro de 500ms
+            _poiDebounce = Timer(const Duration(milliseconds: 500), () async {
+              // 3. Solo cargamos si los POIs están visibles y no hay una carga en curso
+              // Además, validamos que el zoom sea suficiente (ej. > 13) para evitar parpadeos masivos
+              if (_poisVisible && !_poiLoading) {
+                // Verificamos el nivel de zoom actual del estado de la cámara
+                if ((state.cameraState.zoom ?? 0) > 13.0) {
                   await _detectAndLoadCityPOIs();
                 }
-              },
-            ),
-          ),
+              }
+            });
+          },
 
           // ── Botón menú ────────────────────────────────────────────────────
           if (!_navigating)
