@@ -729,13 +729,17 @@ class _MotoGPSAppState extends State<MotoGPSApp> {
             'coordinates': [pLng, pLat],
           },
           'properties': {
-            'name':
-                (e['tags']?['name'] as String?) ?? (cat['label'] as String),
-            'category': catId,
-            'label': cat['label'],
-            'emoji': cat['emoji'],
-            'lat': pLat,
-            'lng': pLng,
+              'name': (e['tags']?['name'] as String?) ?? (cat['label'] as String),
+              'category': catId,
+              'label': cat['label'],
+              'emoji': cat['emoji'],
+              'lat': pLat,
+              'lng': pLng,
+              'phone': (e['tags']?['phone'] as String?) ?? 
+                       (e['tags']?['contact:phone'] as String?) ?? '',
+              'opening_hours': (e['tags']?['opening_hours'] as String?) ?? '',
+              'website': (e['tags']?['website'] as String?) ?? 
+                         (e['tags']?['contact:website'] as String?) ?? '',
           },
         };
       }).toList();
@@ -756,13 +760,16 @@ class _MotoGPSAppState extends State<MotoGPSApp> {
              final properties = feat['properties'] as Map<String, dynamic>;
 
              return {
-               'lat': coordinates[1] as double,
-               'lng': coordinates[0] as double,
-               'name': properties['name'] as String,
-               'category': catId,
-               'label': cat['label'],
-               'emoji': cat['emoji'],
-               'color': cat['color'],
+                 'lat': coordinates[1] as double,
+                 'lng': coordinates[0] as double,
+                 'name': properties['name'] as String,
+                 'category': catId,
+                 'label': cat['label'],
+                 'emoji': cat['emoji'],
+                 'color': cat['color'],
+                 'phone': properties['phone'] as String? ?? '',
+                 'opening_hours': properties['opening_hours'] as String? ?? '',
+                 'website': properties['website'] as String? ?? '',
              };
            })
            .toList();
@@ -1799,26 +1806,98 @@ class _MotoGPSAppState extends State<MotoGPSApp> {
     );
   }
 
+// Parsea opening_hours de OSM y retorna estado legible
+Map<String, dynamic> _parseOpeningHours(String raw) {
+    if (raw.isEmpty) return {'open': null, 'label': ''};
+    if (raw.trim() == '24/7') return {'open': true, 'label': 'Abierto 24/7'};
+
+    try {
+        final now = DateTime.now();
+        final days = ['Mo', 'Tu', 'We', 'Th', 'Fr', 'Sa', 'Su'];
+        final todayKey = days[now.weekday - 1];
+        
+        // Buscar el rango de horas para hoy en el string
+        // Ejemplo: "Mo-Fr 09:00-21:00; Sa 10:00-18:00"
+        final parts = raw.split(';');
+        for (final part in parts) {
+            final trimmed = part.trim();
+            if (trimmed.contains(todayKey) || 
+                trimmed.startsWith('Mo-Fr') && now.weekday <= 5 ||
+                trimmed.startsWith('Mo-Sa') && now.weekday <= 6 ||
+                trimmed.startsWith('Mo-Su')) {
+                final timePart = trimmed.replaceAll(RegExp(r'^[A-Za-z\s\-,]+'), '').trim();
+                if (timePart.contains('-')) {
+                    final times = timePart.split('-');
+                    if (times.length >= 2) {
+                        final openTime = times[0].trim().split(':');
+                        final closeTime = times[1].trim().split(':');
+                        if (openTime.length == 2 && closeTime.length == 2) {
+                            final openH = int.tryParse(openTime[0]) ?? 0;
+                            final openM = int.tryParse(openTime[1]) ?? 0;
+                            final closeH = int.tryParse(closeTime[0]) ?? 0;
+                            final closeM = int.tryParse(closeTime[1]) ?? 0;
+                            final open = TimeOfDay(hour: openH, minute: openM);
+                            final close = TimeOfDay(hour: closeH, minute: closeM);
+                            final nowTime = TimeOfDay(hour: now.hour, minute: now.minute);
+                            final isOpen = (nowTime.hour * 60 + nowTime.minute) >= 
+                                           (open.hour * 60 + open.minute) &&
+                                          (nowTime.hour * 60 + nowTime.minute) < 
+                                           (close.hour * 60 + close.minute);
+                            return {
+                                'open': isOpen,
+                                'label': isOpen 
+                                    ? 'Abierto · Cierra ${times[1].trim()}'
+                                    : 'Cerrado · Abre ${times[0].trim()}'
+                            };
+                        }
+                    }
+                }
+            }
+        }
+        return {'open': null, 'label': raw.length > 30 ? raw.substring(0, 30) : raw};
+    } catch (_) {
+        return {'open': null, 'label': ''};
+    }
+}
+
+// Comparte la ubicación de un POI
+void _sharePoi(Map<String, dynamic> poi) async {
+    final name = poi['name'] as String? ?? 'Lugar';
+    final lat = poi['lat'] as double;
+    final lng = poi['lng'] as double;
+    final mapsUrl = 'https://maps.google.com/?q=$lat,$lng';
+    final text = '📍 $name\n$mapsUrl\n\nCompartido desde MotoGPS 🏍️';
+    final uri = Uri.parse('https://wa.me/?text=${Uri.encodeComponent(text)}');
+    if (await canLaunchUrl(uri)) {
+        await launchUrl(uri, mode: LaunchMode.externalApplication);
+    } else {
+        await Clipboard.setData(ClipboardData(text: text));
+        if (mounted) ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('📋 Ubicación copiada al portapapeles')));
+    }
+}
   // ── NUEVO: Panel de información de POI tocado ─────────────────────────────
   Widget _buildPoiInfoPanel() {
     final poi = _tappedPoi!;
     final poiColor = Color(poi['color'] as int? ?? 0xFF2980B9);
     final poiLat = poi['lat'] as double;
     final poiLng = poi['lng'] as double;
+    final phone = poi['phone'] as String? ?? '';
+    final openingHours = poi['opening_hours'] as String? ?? '';
+    final hoursInfo = _parseOpeningHours(openingHours);
+    final hoursLabel = hoursInfo['label'] as String;
+    final isOpen = hoursInfo['open'] as bool?;
+
     double? distKm;
     if (_currentPosition != null) {
       distKm = _distanceBetween(
               _currentPosition!.latitude,
               _currentPosition!.longitude,
-              poiLat,
-              poiLng) /
-          1000;
+              poiLat, poiLng) / 1000;
     }
-    final distText = distKm == null
-        ? ''
-        : distKm < 1
-            ? '${(distKm * 1000).toStringAsFixed(0)} m'
-            : '${distKm.toStringAsFixed(1)} km';
+    final distText = distKm == null ? ''
+        : distKm < 1 ? '${(distKm * 1000).toStringAsFixed(0)} m'
+        : '${distKm.toStringAsFixed(1)} km';
 
     return Positioned(
       bottom: 30,
@@ -1836,51 +1915,37 @@ class _MotoGPSAppState extends State<MotoGPSApp> {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            // Cabecera con emoji y categoría
+            // ── Cabecera ──
             Row(
               children: [
                 Container(
-                  width: 48,
-                  height: 48,
+                  width: 48, height: 48,
                   decoration: BoxDecoration(
                     color: poiColor,
                     borderRadius: BorderRadius.circular(12),
                   ),
-                  child: Center(
-                    child: Text(poi['emoji'] as String? ?? '📍',
-                        style: const TextStyle(fontSize: 24)),
-                  ),
+                  child: Center(child: Text(poi['emoji'] as String? ?? '📍',
+                      style: const TextStyle(fontSize: 24))),
                 ),
                 const SizedBox(width: 12),
                 Expanded(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text(
-                        poi['name'] as String? ?? 'Sin nombre',
-                        style: const TextStyle(
-                            fontWeight: FontWeight.bold, fontSize: 15),
-                        maxLines: 2,
-                        overflow: TextOverflow.ellipsis,
-                      ),
+                      Text(poi['name'] as String? ?? 'Sin nombre',
+                          style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15),
+                          maxLines: 2, overflow: TextOverflow.ellipsis),
                       const SizedBox(height: 2),
                       Row(
                         children: [
-                          Text(
-                            poi['label'] as String? ?? '',
-                            style: TextStyle(
-                                color: poiColor,
-                                fontSize: 12,
-                                fontWeight: FontWeight.w600),
-                          ),
+                          Text(poi['label'] as String? ?? '',
+                              style: TextStyle(color: poiColor, fontSize: 12,
+                                  fontWeight: FontWeight.w600)),
                           if (distText.isNotEmpty) ...[
-                            const Text('  •  ',
-                                style: TextStyle(color: Colors.grey)),
-                            Text(distText,
-                                style: const TextStyle(
-                                    color: Colors.grey,
-                                    fontSize: 12,
-                                    fontWeight: FontWeight.w500)),
+                            const Text('  •  ', style: TextStyle(color: Colors.grey)),
+                            Text(distText, style: const TextStyle(
+                                color: Colors.grey, fontSize: 12,
+                                fontWeight: FontWeight.w500)),
                           ],
                         ],
                       ),
@@ -1888,14 +1953,81 @@ class _MotoGPSAppState extends State<MotoGPSApp> {
                   ),
                 ),
                 IconButton(
-                  onPressed: () =>
-                      setState(() { _showPoiPanel = false; _tappedPoi = null; }),
+                  onPressed: () => setState(() { _showPoiPanel = false; _tappedPoi = null; }),
                   icon: const Icon(Icons.close, color: Colors.grey, size: 20),
                 ),
               ],
             ),
-            const SizedBox(height: 12),
-            // Botones de acción
+
+            // ── Horario ──
+            if (hoursLabel.isNotEmpty) ...[
+              const SizedBox(height: 10),
+              Row(
+                children: [
+                  Icon(Icons.access_time_rounded,
+                      size: 15,
+                      color: isOpen == null ? Colors.grey
+                           : isOpen ? Colors.green
+                           : Colors.red),
+                  const SizedBox(width: 6),
+                  Expanded(
+                    child: Text(hoursLabel,
+                        style: TextStyle(
+                            fontSize: 12,
+                            fontWeight: FontWeight.w600,
+                            color: isOpen == null ? Colors.grey
+                                 : isOpen ? Colors.green
+                                 : Colors.red)),
+                  ),
+                ],
+              ),
+            ],
+
+            // ── Botones acción ──
+            Row(
+              children: [
+                // Llamar (si hay teléfono)
+                if (phone.isNotEmpty) ...[
+                  Expanded(
+                    child: OutlinedButton.icon(
+                      onPressed: () async {
+                        final uri = Uri.parse('tel:$phone');
+                        if (await canLaunchUrl(uri)) launchUrl(uri);
+                      },
+                      icon: const Icon(Icons.phone, color: Colors.green, size: 18),
+                      label: const Text('Llamar',
+                          style: TextStyle(color: Colors.green, fontSize: 13)),
+                      style: OutlinedButton.styleFrom(
+                        side: const BorderSide(color: Colors.green),
+                        padding: const EdgeInsets.symmetric(vertical: 10),
+                        shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(10)),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                ],
+
+                // Compartir
+                Expanded(
+                  child: OutlinedButton.icon(
+                    onPressed: () => _sharePoi(poi),
+                    icon: const Icon(Icons.share, color: Colors.blue, size: 18),
+                    label: const Text('Compartir',
+                        style: TextStyle(color: Colors.blue, fontSize: 13)),
+                    style: OutlinedButton.styleFrom(
+                      side: const BorderSide(color: Colors.blue),
+                      padding: const EdgeInsets.symmetric(vertical: 10),
+                      shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(10)),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 8),
+
+            // Guardar + Navegar
             Row(
               children: [
                 Expanded(
@@ -1903,8 +2035,7 @@ class _MotoGPSAppState extends State<MotoGPSApp> {
                     onPressed: () {
                       _addPlaceToList(PlaceItem(
                           name: poi['name'] as String? ?? 'POI',
-                          lat: poiLat,
-                          lng: poiLng));
+                          lat: poiLat, lng: poiLng));
                     },
                     icon: const Icon(Icons.bookmark_add_outlined,
                         color: Colors.orange),
@@ -1928,8 +2059,7 @@ class _MotoGPSAppState extends State<MotoGPSApp> {
                     },
                     icon: const Icon(Icons.navigation, color: Colors.white),
                     label: const Text('Navegar',
-                        style: TextStyle(
-                            color: Colors.white,
+                        style: TextStyle(color: Colors.white,
                             fontWeight: FontWeight.bold)),
                     style: ElevatedButton.styleFrom(
                       backgroundColor: Colors.blue[700],
@@ -1946,7 +2076,6 @@ class _MotoGPSAppState extends State<MotoGPSApp> {
       ),
     );
   }
-
   // ── Helpers de UI ─────────────────────────────────────────────────────────
   Widget _buildIconButton(
       {required IconData icon, required VoidCallback onTap}) {
