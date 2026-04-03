@@ -105,6 +105,9 @@ class _MotoGPSAppState extends State<MotoGPSApp> {
   final Map<String, List<Map<String, dynamic>>> _poiData = {}; // para tap detection
   Map<String, dynamic>? _tappedPoi;
   bool _showPoiPanel = false;
+  // Actividad del usuario para recomendaciones
+  final Map<String, int> _categoryTapCount = {};
+  final List<Map<String, dynamic>> _recentlyViewedPois = [];
   bool _followUser = true; // controla si la cámara sigue al usuario
 
   // ── NUEVO: 12 categorías con emoji + color (antes solo 6) ────────────────
@@ -223,6 +226,7 @@ class _MotoGPSAppState extends State<MotoGPSApp> {
     _requestPermissions();
     _loadLists();
     _loadPoiCache();
+    _loadUserActivity();
   }
 
   @override
@@ -335,7 +339,60 @@ class _MotoGPSAppState extends State<MotoGPSApp> {
       debugPrint('[POI Icons] Error cargando íconos: $e');
     }
   }
+Future<void> _saveUserActivity() async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString('category_taps', json.encode(_categoryTapCount));
+    await prefs.setString('recently_viewed', json.encode(_recentlyViewedPois));
+}
 
+Future<void> _loadUserActivity() async {
+    final prefs = await SharedPreferences.getInstance();
+    final tapsRaw = prefs.getString('category_taps');
+    final recentRaw = prefs.getString('recently_viewed');
+    if (tapsRaw != null) {
+        final map = json.decode(tapsRaw) as Map<String, dynamic>;
+        map.forEach((k, v) => _categoryTapCount[k] = v as int);
+    }
+    if (recentRaw != null) {
+        final list = json.decode(recentRaw) as List;
+        _recentlyViewedPois.addAll(list.cast<Map<String, dynamic>>());
+    }
+}
+
+// Genera recomendaciones basadas en actividad
+List<Map<String, dynamic>> _getRecommendations() {
+    if (_categoryTapCount.isEmpty && _recentlyViewedPois.isEmpty) return [];
+
+    final List<Map<String, dynamic>> recs = [];
+
+    // Top 3 categorías más usadas
+    final sortedCats = _categoryTapCount.entries.toList()
+        ..sort((a, b) => b.value.compareTo(a.value));
+
+    for (final entry in sortedCats.take(3)) {
+        final cat = _poiCategories.firstWhere(
+            (c) => c['id'] == entry.key,
+            orElse: () => <String, dynamic>{},
+        );
+        if (cat.isEmpty) continue;
+        // Buscar POIs disponibles de esa categoría
+        final pois = _poiData[entry.key] ?? [];
+        if (pois.isNotEmpty) {
+            recs.add({
+                'type': 'category',
+                'catId': entry.key,
+                'label': cat['label'],
+                'emoji': cat['emoji'],
+                'color': cat['color'],
+                'count': entry.value,
+                'pois': pois.take(3).toList(),
+            });
+        }
+    }
+
+    return recs;
+}
+    
     Future<void> _loadPoiCache() async {
   final prefs = await SharedPreferences.getInstance();
   final keys = prefs.getStringList('poi_cache_keys') ?? [];
@@ -1011,11 +1068,19 @@ class _MotoGPSAppState extends State<MotoGPSApp> {
     if (_poisVisible && !_navigating) {
       final tappedPoi = _detectPoiTap(lat, lng);
       if (tappedPoi != null) {
-        setState(() {
-          _tappedPoi = tappedPoi;
-          _showPoiPanel = true;
-          _showTapConfirm = false;
-        });
+          // Registrar actividad
+          final catId = tappedPoi['category'] as String;
+          _categoryTapCount[catId] = (_categoryTapCount[catId] ?? 0) + 1;
+          _recentlyViewedPois.removeWhere((p) => p['name'] == tappedPoi['name']);
+          _recentlyViewedPois.insert(0, tappedPoi);
+          if (_recentlyViewedPois.length > 10) _recentlyViewedPois.removeLast();
+          await _saveUserActivity();
+
+          setState(() {
+              _tappedPoi = tappedPoi;
+              _showPoiPanel = true;
+              _showTapConfirm = false;
+          });
         mapboxMap?.flyTo(
           mapbox.CameraOptions(
             center: mapbox.Point(
@@ -2128,102 +2193,247 @@ void _sharePoi(Map<String, dynamic> poi) async {
 
   // ── Drawer ────────────────────────────────────────────────────────────────
   Widget _buildDrawer() {
+    final recs = _getRecommendations();
+
     return Drawer(
       child: SafeArea(
         child: Column(
           children: [
+            // ── Header ──
             Container(
               width: double.infinity,
               padding: const EdgeInsets.all(20),
               decoration: BoxDecoration(color: Colors.blue[700]),
-              child: Column(
+              child: const Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
-                children: const [
+                children: [
                   Text('🏍️ MotoGPS',
-                      style: TextStyle(
-                          color: Colors.white,
-                          fontSize: 22,
-                          fontWeight: FontWeight.bold)),
+                      style: TextStyle(color: Colors.white,
+                          fontSize: 22, fontWeight: FontWeight.bold)),
                   SizedBox(height: 4),
-                  Text('Mis listas de lugares',
-                      style:
-                          TextStyle(color: Colors.white70, fontSize: 14)),
+                  Text('Tu navegador de moto',
+                      style: TextStyle(color: Colors.white70, fontSize: 14)),
                 ],
               ),
             ),
+
             Expanded(
-              child: _placeLists.isEmpty
-                  ? Center(
+              child: ListView(
+                padding: EdgeInsets.zero,
+                children: [
+
+                  // ── Sección Recomendaciones ──────────────────────────
+                  _buildDrawerSectionHeader(
+                      '⭐ Recomendado para ti', Icons.auto_awesome),
+
+                  if (recs.isEmpty)
+                    Padding(
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 16, vertical: 12),
+                      child: Container(
+                        padding: const EdgeInsets.all(14),
+                        decoration: BoxDecoration(
+                          color: Colors.blue[50],
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        child: const Row(
+                          children: [
+                            Text('🗺️', style: TextStyle(fontSize: 24)),
+                            SizedBox(width: 12),
+                            Expanded(
+                              child: Text(
+                                'Explora el mapa y toca algunos lugares para recibir recomendaciones personalizadas.',
+                                style: TextStyle(
+                                    color: Colors.blueGrey, fontSize: 12),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    )
+                  else
+                    ...recs.map((rec) => _buildRecommendationTile(rec)),
+
+                  const Divider(height: 24),
+
+                  // ── Sección Mis Listas ───────────────────────────────
+                  _buildDrawerSectionHeader(
+                      '📍 Mis listas de lugares', Icons.bookmark),
+
+                  if (_placeLists.isEmpty)
+                    Padding(
+                      padding: const EdgeInsets.all(16),
                       child: Column(
-                        mainAxisSize: MainAxisSize.min,
                         children: [
                           const Text('📭',
-                              style: TextStyle(fontSize: 48)),
-                          const SizedBox(height: 12),
+                              style: TextStyle(fontSize: 40)),
+                          const SizedBox(height: 8),
                           const Text('No tienes listas aún',
                               style: TextStyle(
-                                  color: Colors.grey, fontSize: 16)),
-                          const SizedBox(height: 16),
+                                  color: Colors.grey, fontSize: 14)),
+                          const SizedBox(height: 12),
                           ElevatedButton.icon(
-                              onPressed: _createList,
-                              icon: const Icon(Icons.add),
-                              label: const Text('Crear lista')),
+                            onPressed: _createList,
+                            icon: const Icon(Icons.add),
+                            label: const Text('Crear lista'),
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: Colors.blue[700],
+                              foregroundColor: Colors.white,
+                            ),
+                          ),
                         ],
                       ),
                     )
-                  : ListView.builder(
-                      itemCount: _placeLists.length,
-                      itemBuilder: (_, i) {
-                        final list = _placeLists[i];
-                        return ListTile(
-                          leading: Text(list.emoji,
-                              style: const TextStyle(fontSize: 28)),
-                          title: Text(list.name,
-                              style: const TextStyle(
-                                  fontWeight: FontWeight.w600)),
-                          subtitle: Text(
-                              '${list.places.length} lugar${list.places.length == 1 ? '' : 'es'}'),
-                          trailing: Row(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              IconButton(
-                                  icon: const Icon(Icons.share,
-                                      color: Colors.blue, size: 20),
-                                  onPressed: () => _shareList(list)),
-                              const Icon(Icons.chevron_right,
-                                  color: Colors.grey),
-                            ],
+                  else ...[
+                    ...(_placeLists.map((list) => ListTile(
+                      leading: Text(list.emoji,
+                          style: const TextStyle(fontSize: 26)),
+                      title: Text(list.name,
+                          style: const TextStyle(
+                              fontWeight: FontWeight.w600)),
+                      subtitle: Text(
+                          '${list.places.length} lugar${list.places.length == 1 ? '' : 'es'}'),
+                      trailing: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          IconButton(
+                              icon: const Icon(Icons.share,
+                                  color: Colors.blue, size: 20),
+                              onPressed: () => _shareList(list)),
+                          const Icon(Icons.chevron_right,
+                              color: Colors.grey),
+                        ],
+                      ),
+                      onTap: () => _openList(list),
+                    ))),
+                    Padding(
+                      padding: const EdgeInsets.all(16),
+                      child: SizedBox(
+                        width: double.infinity,
+                        child: ElevatedButton.icon(
+                          onPressed: _createList,
+                          icon: const Icon(Icons.add),
+                          label: const Text('Nueva lista'),
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: Colors.blue[700],
+                            foregroundColor: Colors.white,
+                            padding:
+                                const EdgeInsets.symmetric(vertical: 14),
+                            shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(12)),
                           ),
-                          onTap: () => _openList(list),
-                        );
-                      },
+                        ),
+                      ),
                     ),
-            ),
-            if (_placeLists.isNotEmpty)
-              Padding(
-                padding: const EdgeInsets.all(16),
-                child: SizedBox(
-                  width: double.infinity,
-                  child: ElevatedButton.icon(
-                    onPressed: _createList,
-                    icon: const Icon(Icons.add),
-                    label: const Text('Nueva lista'),
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: Colors.blue[700],
-                      foregroundColor: Colors.white,
-                      padding: const EdgeInsets.symmetric(vertical: 14),
-                      shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(12)),
-                    ),
-                  ),
-                ),
+                  ],
+                ],
               ),
+            ),
           ],
         ),
       ),
     );
   }
-}
+
+  Widget _buildDrawerSectionHeader(String title, IconData icon) {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16, 16, 16, 4),
+      child: Row(
+        children: [
+          Icon(icon, size: 18, color: Colors.blue[700]),
+          const SizedBox(width: 8),
+          Text(title,
+              style: TextStyle(
+                  fontSize: 13,
+                  fontWeight: FontWeight.bold,
+                  color: Colors.blue[700],
+                  letterSpacing: 0.3)),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildRecommendationTile(Map<String, dynamic> rec) {
+    final pois = rec['pois'] as List<dynamic>;
+    final color = Color(rec['color'] as int);
+    final count = rec['count'] as int;
+
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+      child: Container(
+        decoration: BoxDecoration(
+          color: Colors.grey[50],
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(color: Colors.grey[200]!),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            // Cabecera de categoría
+            Padding(
+              padding: const EdgeInsets.fromLTRB(12, 10, 12, 4),
+              child: Row(
+                children: [
+                  Container(
+                    width: 32, height: 32,
+                    decoration: BoxDecoration(
+                        color: color,
+                        borderRadius: BorderRadius.circular(8)),
+                    child: Center(
+                        child: Text(rec['emoji'] as String,
+                            style: const TextStyle(fontSize: 16))),
+                  ),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: Text(rec['label'] as String,
+                        style: const TextStyle(
+                            fontWeight: FontWeight.bold, fontSize: 13)),
+                  ),
+                  Container(
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: 8, vertical: 3),
+                    decoration: BoxDecoration(
+                        color: color.withOpacity(0.15),
+                        borderRadius: BorderRadius.circular(20)),
+                    child: Text('$count visitas',
+                        style: TextStyle(
+                            fontSize: 10,
+                            color: color,
+                            fontWeight: FontWeight.bold)),
+                  ),
+                ],
+              ),
+            ),
+            // POIs sugeridos
+            ...pois.map((poi) {
+              final p = poi as Map<String, dynamic>;
+              return ListTile(
+                dense: true,
+                contentPadding:
+                    const EdgeInsets.symmetric(horizontal: 12, vertical: 0),
+                leading: const Icon(Icons.location_on_outlined,
+                    size: 18, color: Colors.grey),
+                title: Text(p['name'] as String? ?? '',
+                    style: const TextStyle(fontSize: 12),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis),
+                trailing: const Icon(Icons.navigation_outlined,
+                    size: 18, color: Colors.blue),
+                onTap: () {
+                  Navigator.pop(context);
+                  _goToPlace(
+                    p['lat'] as double,
+                    p['lng'] as double,
+                    p['name'] as String? ?? 'Destino',
+                  );
+                },
+              );
+            }),
+          ],
+        ),
+      ),
+    );
+  }
 
 // ── PlaceListScreen ───────────────────────────────────────────────────────────
 class PlaceListScreen extends StatefulWidget {
