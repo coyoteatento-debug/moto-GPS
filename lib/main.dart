@@ -2543,7 +2543,10 @@ class _PlaceListScreenState extends State<PlaceListScreen> {
                           icon: const Icon(Icons.delete_outline,
                               color: Colors.red),
                           onPressed: () =>
-                              setState(() => widget.onDelete(place))),
+                              setState(() {
+                                  list.places.remove(place);
+                                   _saveLists();
+                              }),
                     ],
                   ),
                 );
