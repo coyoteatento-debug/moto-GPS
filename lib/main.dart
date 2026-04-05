@@ -806,93 +806,99 @@ class _MotoGPSAppState extends State<MotoGPSApp> {
   }
 
   // ── Búsqueda con bias de posición ─────────────────────
-  Future<void> _searchPlaces(String query) async {
+Future<void> _searchPlaces(String query) async {
   if (query.isEmpty) { setState(() => _searchResults = []); return; }
   
   final results = <Map<String, dynamic>>[];
   
-  // ── Búsqueda 1: Mapbox Geocoding ──────────────────────
-  try {
-    String url;
-    if (_currentPosition != null) {
-      final lat = _currentPosition!.latitude;
-      final lng = _currentPosition!.longitude;
-      url = 'https://api.mapbox.com/geocoding/v5/mapbox.places/'
-            '${Uri.encodeComponent(query)}.json'
-            '?access_token=$_mapboxToken&language=es&limit=8'
-            '&proximity=$lng,$lat'
-            '&country=mx'
-            '&types=poi,place,locality,neighborhood,address';
-    } else {
-      url = 'https://api.mapbox.com/geocoding/v5/mapbox.places/'
-            '${Uri.encodeComponent(query)}.json'
-            '?access_token=$_mapboxToken&language=es&limit=8'
-            '&country=mx'
-             '&types=poi,place,locality,neighborhood,address';
-    }
-    final response = await http.get(Uri.parse(url));
-    if (response.statusCode == 200) {
-      final features = json.decode(response.body)['features'] as List;
-      for (final f in features) {
-        final resLng = f['center'][0] as double;
-        final resLat = f['center'][1] as double;
-        double? distKm;
-        if (_currentPosition != null) {
-          distKm = _distanceBetween(
-              _currentPosition!.latitude, _currentPosition!.longitude,
-              resLat, resLng) / 1000;
-        }
-        results.add({
-          'name':   f['place_name'] as String,
-          'short':  f['text'] as String,
-          'lng':    resLng,
-          'lat':    resLat,
-          'distKm': distKm,
-          'source': 'mapbox',
-        });
-      }
-    }
-  } catch (_) {}
-
-  // ── Búsqueda 2: Overpass (OpenStreetMap) ───────────────
   if (_currentPosition != null) {
+    final lat = _currentPosition!.latitude;
+    final lng = _currentPosition!.longitude;
+    const double radius = 15000; // 15 km
     try {
-      final lat = _currentPosition!.latitude;
-      final lng = _currentPosition!.longitude;
-      const double radius = 10000; // 10 km
-      final overpassQuery = '[out:json][timeout:15];\n'
-    '(\n'
-    '  node["name"~="${query}",i](around:${radius},${lat},${lng});\n'
-    '  way["name"~="${query}",i](around:${radius},${lat},${lng});\n'
-    ');\n'
-    'out center 10;\n';
+      final overpassQuery = '[out:json][timeout:20];\n'
+          '(\n'
+          '  node["name"~"${query}",i](around:${radius},${lat},${lng});\n'
+          '  way["name"~"${query}",i](around:${radius},${lat},${lng});\n'
+          '  node["brand"~"${query}",i](around:${radius},${lat},${lng});\n'
+          '  way["brand"~"${query}",i](around:${radius},${lat},${lng});\n'
+          ');\n'
+          'out center 10;\n';
       final response = await http.post(
         Uri.parse('https://overpass-api.de/api/interpreter'),
         body: overpassQuery,
-      );
+      ).timeout(const Duration(seconds: 20));
       if (response.statusCode == 200) {
         final elements = json.decode(response.body)['elements'] as List;
         for (final e in elements) {
           final pLat = e['type'] == 'node'
-              ? e['lat'] as double
-              : (e['center']?['lat'] as double? ?? 0.0);
+              ? (e['lat'] as num).toDouble()
+              : (e['center']?['lat'] as num?)?.toDouble() ?? 0.0;
           final pLng = e['type'] == 'node'
-              ? e['lon'] as double
-              : (e['center']?['lon'] as double? ?? 0.0);
+              ? (e['lon'] as num).toDouble()
+              : (e['center']?['lon'] as num?)?.toDouble() ?? 0.0;
           if (pLat == 0.0 && pLng == 0.0) continue;
-          final name = e['tags']?['name'] as String? ?? query;
-          // evitar duplicados
+          final name = e['tags']?['name'] as String?
+              ?? e['tags']?['brand'] as String?
+              ?? query;
+          final addr = e['tags']?['addr:street'] as String? ?? '';
+          final fullName = addr.isNotEmpty ? '$name — $addr' : name;
           final isDup = results.any((r) =>
-              _distanceBetween(r['lat'], r['lng'], pLat, pLng) < 100);
+              _distanceBetween(r['lat'], r['lng'], pLat, pLng) < 50);
           if (isDup) continue;
           final distKm = _distanceBetween(lat, lng, pLat, pLng) / 1000;
           results.add({
-            'name':   name,
+            'name':   fullName,
             'short':  name,
             'lng':    pLng,
             'lat':    pLat,
             'distKm': distKm,
             'source': 'osm',
+          });
+        }
+      }
+    } catch (_) {}
+  }
+
+  // ── Fallback Mapbox si no hay resultados OSM ──────────
+  if (results.isEmpty) {
+    try {
+      String url;
+      if (_currentPosition != null) {
+        final lat = _currentPosition!.latitude;
+        final lng = _currentPosition!.longitude;
+        url = 'https://api.mapbox.com/geocoding/v5/mapbox.places/'
+              '${Uri.encodeComponent(query)}.json'
+              '?access_token=$_mapboxToken&language=es&limit=8'
+              '&proximity=$lng,$lat'
+              '&country=mx'
+              '&types=poi,place,locality,neighborhood,address';
+      } else {
+        url = 'https://api.mapbox.com/geocoding/v5/mapbox.places/'
+              '${Uri.encodeComponent(query)}.json'
+              '?access_token=$_mapboxToken&language=es&limit=8'
+              '&country=mx'
+              '&types=poi,place,locality,neighborhood,address';
+      }
+      final response = await http.get(Uri.parse(url));
+      if (response.statusCode == 200) {
+        final features = json.decode(response.body)['features'] as List;
+        for (final f in features) {
+          final resLng = f['center'][0] as double;
+          final resLat = f['center'][1] as double;
+          double? distKm;
+          if (_currentPosition != null) {
+            distKm = _distanceBetween(
+                _currentPosition!.latitude, _currentPosition!.longitude,
+                resLat, resLng) / 1000;
+          }
+          results.add({
+            'name':   f['place_name'] as String,
+            'short':  f['text'] as String,
+            'lng':    resLng,
+            'lat':    resLat,
+            'distKm': distKm,
+            'source': 'mapbox',
           });
         }
       }
