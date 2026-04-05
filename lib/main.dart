@@ -54,6 +54,8 @@ class MotoGPSApp extends StatefulWidget {
 
 class _MotoGPSAppState extends State<MotoGPSApp> {
 
+  Timer? _poiDebounceTimer;
+  
   mapbox.MapboxMap? mapboxMap;
   mapbox.PointAnnotationManager? annotationManager;
   mapbox.PointAnnotation? motoAnnotation;
@@ -109,6 +111,7 @@ class _MotoGPSAppState extends State<MotoGPSApp> {
 
   @override
   void dispose() {
+    _poiDebounceTimer?.cancel();
     _searchController.dispose();
     super.dispose();
   }
@@ -1054,22 +1057,24 @@ class _MotoGPSAppState extends State<MotoGPSApp> {
               cameraOptions: mapbox.CameraOptions(zoom: 15.0, pitch: 0.0),
               onCameraChangeListener: (state) async {
                 if (_isProgrammaticMove) {
-                  // movimiento programático → ignorar y programar reset del flag
                   Future.delayed(const Duration(milliseconds: 1200), () {
                     if (mounted) setState(() => _isProgrammaticMove = false);
-                  });
-                } else {
-                  // movimiento manual del usuario → activar modo exploración
-                  if (!_userIsExploring) {
-                    setState(() => _userIsExploring = true);
-                  }
+                });
+              } else {
+                if (!_userIsExploring) {
+                  setState(() => _userIsExploring = true);
                 }
-                if (_poisVisible && !_poiLoading) {
-                  await _detectAndLoadCityPOIs();
+              }
+              // ── Debounce POIs — espera 800ms después del último movimiento ──
+              _poiDebounceTimer?.cancel();
+              _poiDebounceTimer = Timer(const Duration(milliseconds: 800), () {
+                if (_poisVisible && !_poiLoading && mounted) {
+                  _detectAndLoadCityPOIs();
                 }
-              },
-            ),
+              });
+            },
           ),
+        ),
 
           // ── Botón menú ───────────────────────────────
           if (!_navigating)
