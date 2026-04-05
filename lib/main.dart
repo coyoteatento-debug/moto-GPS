@@ -305,8 +305,173 @@ class _MotoGPSAppState extends State<MotoGPSApp> {
   Future<void> _onMapCreated(mapbox.MapboxMap map) async {
     mapboxMap = map;
     annotationManager = await map.annotations.createPointAnnotationManager();
+    await Future.delayed(const Duration(milliseconds: 600));
+    await _applyCustomRoadStyle();
   }
 
+    // ── Estilo de carreteras tipo Riser ───────────────────
+  Future<void> _applyCustomRoadStyle() async {
+    if (mapboxMap == null) return;
+    final style = await mapboxMap!.style;
+
+    // Estructura: layerId → {color de línea, color casing, ancho base, ancho casing}
+    final List<Map<String, dynamic>> roadConfig = [
+
+      // ── AUTOPISTAS / CARRETERAS (naranja) ─────────────
+      {
+        'layer': 'road-motorway-trunk',
+        'color': '#F5820C',
+        'width': [
+          'interpolate', ['linear'], ['zoom'],
+          8, 1.5,   // zoom 8  → 1.5px
+          12, 4.0,  // zoom 12 → 4px
+          16, 10.0, // zoom 16 → 10px
+          20, 16.0, // zoom 20 → 16px
+        ],
+      },
+      {
+        'layer': 'road-motorway-trunk-case',
+        'color': '#C96800',
+        'width': [
+          'interpolate', ['linear'], ['zoom'],
+          8, 2.5,
+          12, 6.0,
+          16, 13.0,
+          20, 20.0,
+        ],
+      },
+
+      // ── AVENIDAS PRIMARIAS (amarillo intenso) ──────────
+      {
+        'layer': 'road-primary',
+        'color': '#FFD600',
+        'width': [
+          'interpolate', ['linear'], ['zoom'],
+          8, 1.0,
+          12, 3.0,
+          16, 8.0,
+          20, 14.0,
+        ],
+      },
+      {
+        'layer': 'road-primary-case',
+        'color': '#D4B000',
+        'width': [
+          'interpolate', ['linear'], ['zoom'],
+          8, 2.0,
+          12, 5.0,
+          16, 11.0,
+          20, 18.0,
+        ],
+      },
+
+      // ── VIALIDADES SECUNDARIAS (amarillo suave) ────────
+      {
+        'layer': 'road-secondary-tertiary',
+        'color': '#FFE566',
+        'width': [
+          'interpolate', ['linear'], ['zoom'],
+          10, 0.8,
+          13, 2.0,
+          16, 6.0,
+          20, 10.0,
+        ],
+      },
+      {
+        'layer': 'road-secondary-tertiary-case',
+        'color': '#C8B040',
+        'width': [
+          'interpolate', ['linear'], ['zoom'],
+          10, 1.5,
+          13, 3.5,
+          16, 8.5,
+          20, 13.0,
+        ],
+      },
+
+      // ── CALLES LOCALES (blanco) ────────────────────────
+      {
+        'layer': 'road-street',
+        'color': '#FFFFFF',
+        'width': [
+          'interpolate', ['linear'], ['zoom'],
+          13, 0.5,
+          16, 3.5,
+          20, 7.0,
+        ],
+      },
+      {
+        'layer': 'road-street-low',
+        'color': '#FFFFFF',
+        'width': [
+          'interpolate', ['linear'], ['zoom'],
+          13, 0.5,
+          16, 3.5,
+          20, 7.0,
+        ],
+      },
+      {
+        'layer': 'road-street-case',
+        'color': '#CCCCCC',
+        'width': [
+          'interpolate', ['linear'], ['zoom'],
+          13, 1.0,
+          16, 5.5,
+          20, 10.0,
+        ],
+      },
+
+      // ── CAMINOS / SENDEROS (gris cálido) ──────────────
+      {
+        'layer': 'road-path',
+        'color': '#D9CEBC',
+        'width': [
+          'interpolate', ['linear'], ['zoom'],
+          14, 0.5,
+          17, 2.0,
+          20, 4.0,
+        ],
+      },
+      {
+        'layer': 'road-pedestrian',
+        'color': '#EDE8DC',
+        'width': [
+          'interpolate', ['linear'], ['zoom'],
+          14, 0.8,
+          17, 2.5,
+          20, 5.0,
+        ],
+      },
+    ];
+
+    for (final road in roadConfig) {
+      // Aplicar color
+      try {
+        await style.setStyleLayerProperty(
+          road['layer'] as String,
+          'line-color',
+          json.encode(road['color']),
+        );
+      } catch (_) {}
+
+      // Aplicar grosor con interpolación por zoom
+      try {
+        await style.setStyleLayerProperty(
+          road['layer'] as String,
+          'line-width',
+          json.encode(road['width']),
+        );
+      } catch (_) {}
+    }
+
+    // ── Fondo crema cálido tipo Riser ──────────────────
+    try {
+      await style.setStyleLayerProperty(
+        'land', 'background-color', json.encode('#F5F0E8'),
+      );
+    } catch (_) {}
+  }
+    
   // ── POIs ──────────────────────────────────────────────
   Future<void> _detectAndLoadCityPOIs() async {
     if (!_poisVisible || mapboxMap == null || _poiLoading) return;
@@ -863,7 +1028,7 @@ class _MotoGPSAppState extends State<MotoGPSApp> {
             child: mapbox.MapWidget(
               key: const ValueKey("mapWidget"),
               onMapCreated: _onMapCreated,
-              styleUri: mapbox.MapboxStyles.STANDARD,
+              styleUri: 'mapbox://styles/mapbox/streets-v12',
               onTapListener: _onMapTap,
               cameraOptions: mapbox.CameraOptions(zoom: 15.0, pitch: 0.0),
               onCameraChangeListener: (state) async {
