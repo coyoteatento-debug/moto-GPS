@@ -816,8 +816,63 @@ Future<void> _searchPlaces(String query) async {
     final lng = _currentPosition!.longitude;
     const double radius = 15000; // 15 km
     try {
+      // ── Mapa semántico: palabra clave → tag OSM ──────────
+      const semanticTags = <String, String>{
+        'gasolinera'    : 'amenity=fuel',
+        'gasolineras'   : 'amenity=fuel',
+        'gas'           : 'amenity=fuel',
+        'pemex'         : 'amenity=fuel',
+        'combustible'   : 'amenity=fuel',
+        'restaurante'   : 'amenity=restaurant',
+        'restaurantes'  : 'amenity=restaurant',
+        'comida'        : 'amenity=restaurant',
+        'taqueria'      : 'amenity=restaurant',
+        'tacos'         : 'amenity=restaurant',
+        'hospital'      : 'amenity=hospital',
+        'hospitales'    : 'amenity=hospital',
+        'clinica'       : 'amenity=clinic',
+        'emergencias'   : 'amenity=hospital',
+        'hotel'         : 'tourism=hotel',
+        'hoteles'       : 'tourism=hotel',
+        'motel'         : 'tourism=motel',
+        'posada'        : 'tourism=guest_house',
+        'supermercado'  : 'shop=supermarket',
+        'supermercados' : 'shop=supermarket',
+        'walmart'       : 'shop=supermarket',
+        'tienda'        : 'shop=convenience',
+        'tiendas'       : 'shop=convenience',
+        'oxxo'          : 'shop=convenience',
+        'farmacia'      : 'amenity=pharmacy',
+        'farmacias'     : 'amenity=pharmacy',
+        'banco'         : 'amenity=bank',
+        'bancos'        : 'amenity=bank',
+        'cajero'        : 'amenity=atm',
+        'atm'           : 'amenity=atm',
+        'taller'        : 'shop=car_repair',
+        'mecanico'      : 'shop=car_repair',
+        'llantera'      : 'shop=tyres',
+        'estacionamiento': 'amenity=parking',
+        'parking'       : 'amenity=parking',
+        'cafe'          : 'amenity=cafe',
+        'cafeteria'     : 'amenity=cafe',
+        'panaderia'     : 'shop=bakery',
+        'tortilleria'   : 'shop=tortilla',
+      };
+
+      // ── Líneas de categoría OSM si hay match semántico ──
+      final qLower = query.toLowerCase().trim();
+      final osmTag = semanticTags[qLower];
+      String categoryLines = '';
+      if (osmTag != null) {
+        final kv = osmTag.split('=');
+        categoryLines =
+          '  node["${kv[0]}"="${kv[1]}"](around:${radius},${lat},${lng});\n'
+          '  way["${kv[0]}"="${kv[1]}"](around:${radius},${lat},${lng});\n';
+      }
+
       final overpassQuery = '[out:json][timeout:20];\n'
           '(\n'
+          '${categoryLines}'
           '  node["name"~"${query}",i](around:${radius},${lat},${lng});\n'
           '  way["name"~"${query}",i](around:${radius},${lat},${lng});\n'
           '  node["brand"~"${query}",i](around:${radius},${lat},${lng});\n'
@@ -867,10 +922,19 @@ Future<void> _searchPlaces(String query) async {
       if (_currentPosition != null) {
         final lat = _currentPosition!.latitude;
         final lng = _currentPosition!.longitude;
+        // ── bbox estricto ≈ 15 km alrededor del usuario ──────
+        // 0.135° ≈ 15 km en latitud; suficiente para mantener
+        // los resultados dentro de la misma ciudad
+        const double delta = 0.135;
+        final bboxMinLng = (lng - delta).toStringAsFixed(6);
+        final bboxMinLat = (lat - delta).toStringAsFixed(6);
+        final bboxMaxLng = (lng + delta).toStringAsFixed(6);
+        final bboxMaxLat = (lat + delta).toStringAsFixed(6);
         url = 'https://api.mapbox.com/geocoding/v5/mapbox.places/'
               '${Uri.encodeComponent(query)}.json'
               '?access_token=$_mapboxToken&language=es&limit=8'
               '&proximity=$lng,$lat'
+              '&bbox=$bboxMinLng,$bboxMinLat,$bboxMaxLng,$bboxMaxLat'
               '&country=mx'
               '&types=poi,place,locality,neighborhood,address';
       } else {
@@ -891,6 +955,8 @@ Future<void> _searchPlaces(String query) async {
             distKm = _distanceBetween(
                 _currentPosition!.latitude, _currentPosition!.longitude,
                 resLat, resLng) / 1000;
+            // ── Filtro de seguridad: descartar resultados > 20 km ──
+            if (distKm > 20) continue;
           }
           results.add({
             'name':   f['place_name'] as String,
