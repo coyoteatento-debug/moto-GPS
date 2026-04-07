@@ -847,7 +847,8 @@ class _MotoGPSAppState extends State<MotoGPSApp> {
       'cafe'           : 'cafe',
       'mall'           : 'mall',
     };
-
+    
+    final qLower = query.toLowerCase().trim();
     final mapboxQuery = semanticMapbox[qLower] ?? query;;
 
     // ── Helper: agrega elemento Overpass a results ────────
