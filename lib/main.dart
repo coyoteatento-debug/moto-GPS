@@ -876,6 +876,8 @@ class _MotoGPSAppState extends State<MotoGPSApp> {
           ?? query;
       final addr    = e['tags']?['addr:street'] as String? ?? '';
       final fullName = addr.isNotEmpty ? '$name — $addr' : name;
+      final distKm = _distanceBetween(userLat, userLng, pLat, pLng) / 1000;
+      if (distKm > 20) return;
       final isDup   = results.any((r) =>
           _distanceBetween(r['lat'] as double, r['lng'] as double, pLat, pLng) < 80);
       if (isDup) return;
