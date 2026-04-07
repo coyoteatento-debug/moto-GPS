@@ -881,7 +881,6 @@ class _MotoGPSAppState extends State<MotoGPSApp> {
       final isDup   = results.any((r) =>
           _distanceBetween(r['lat'] as double, r['lng'] as double, pLat, pLng) < 80);
       if (isDup) return;
-      final distKm = _distanceBetween(userLat, userLng, pLat, pLng) / 1000;
       results.add({
         'name': fullName, 'short': name,
         'lng': pLng, 'lat': pLat,
