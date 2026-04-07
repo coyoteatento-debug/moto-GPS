@@ -892,7 +892,7 @@ class _MotoGPSAppState extends State<MotoGPSApp> {
       final lat = _currentPosition!.latitude;
       final lng = _currentPosition!.longitude;
       const double radius = 15000; // 15 km
-      const double delta  = 0.135; // ≈ 15 km en grados
+      const double delta  = 0.09; // ≈ 10 km en grados
 
       // ════════════════════════════════════════════════════
       // PASO 1 — Mapbox POI con bbox (siempre se ejecuta)
@@ -920,7 +920,7 @@ class _MotoGPSAppState extends State<MotoGPSApp> {
             final resLat = (f['center'][1] as num).toDouble();
             final distKm =
                 _distanceBetween(lat, lng, resLat, resLng) / 1000;
-            if (distKm > 20) continue;
+            if (distKm > 15) continue;
             final isDup = results.any((r) =>
                 _distanceBetween(r['lat'] as double, r['lng'] as double,
                     resLat, resLng) < 80);
@@ -1015,7 +1015,7 @@ class _MotoGPSAppState extends State<MotoGPSApp> {
               final resLat = (f['center'][1] as num).toDouble();
               final distKm =
                   _distanceBetween(lat, lng, resLat, resLng) / 1000;
-              if (distKm > 30) continue; // radio ampliado solo en último recurso
+              if (distKm > 15) continue;
               results.add({
                 'name': f['place_name'] as String,
                 'short': f['text'] as String,
