@@ -819,48 +819,36 @@ class _MotoGPSAppState extends State<MotoGPSApp> {
     final results = <Map<String, dynamic>>[];
 
     // ── Mapa semántico: palabra clave → tag OSM ──────────
-    const semanticTags = <String, String>{
-      'gasolinera'     : 'amenity=fuel',
-      'gasolineras'    : 'amenity=fuel',
-      'gas'            : 'amenity=fuel',
-      'pemex'          : 'amenity=fuel',
-      'combustible'    : 'amenity=fuel',
-      'restaurante'    : 'amenity=restaurant',
-      'restaurantes'   : 'amenity=restaurant',
-      'comida'         : 'amenity=restaurant',
-      'taqueria'       : 'amenity=restaurant',
-      'tacos'          : 'amenity=restaurant',
-      'hospital'       : 'amenity=hospital',
-      'hospitales'     : 'amenity=hospital',
-      'clinica'        : 'amenity=clinic',
-      'emergencias'    : 'amenity=hospital',
-      'hotel'          : 'tourism=hotel',
-      'hoteles'        : 'tourism=hotel',
-      'motel'          : 'tourism=motel',
-      'posada'         : 'tourism=guest_house',
-      'supermercado'   : 'shop=supermarket',
-      'supermercados'  : 'shop=supermarket',
-      'tienda'         : 'shop=convenience',
-      'tiendas'        : 'shop=convenience',
-      'farmacia'       : 'amenity=pharmacy',
-      'farmacias'      : 'amenity=pharmacy',
-      'banco'          : 'amenity=bank',
-      'bancos'         : 'amenity=bank',
-      'cajero'         : 'amenity=atm',
-      'atm'            : 'amenity=atm',
-      'taller'         : 'shop=car_repair',
-      'mecanico'       : 'shop=car_repair',
-      'llantera'       : 'shop=tyres',
-      'estacionamiento': 'amenity=parking',
-      'parking'        : 'amenity=parking',
-      'cafe'           : 'amenity=cafe',
-      'cafeteria'      : 'amenity=cafe',
-      'panaderia'      : 'shop=bakery',
-      'tortilleria'    : 'shop=tortilla',
+    const semanticMapbox = <String, String>{
+      'gasolinera'     : 'gas station',
+      'gasolineras'    : 'gas station',
+      'gas'            : 'gas station',
+      'pemex'          : 'pemex',
+      'combustible'    : 'gas station',
+      'restaurante'    : 'restaurant',
+      'restaurantes'   : 'restaurant',
+      'comida'         : 'restaurant',
+      'taqueria'       : 'taqueria',
+      'tacos'          : 'tacos',
+      'hospital'       : 'hospital',
+      'hospitales'     : 'hospital',
+      'clinica'        : 'clinic',
+      'hotel'          : 'hotel',
+      'hoteles'        : 'hotel',
+      'motel'          : 'motel',
+      'supermercado'   : 'supermarket',
+      'farmacia'       : 'pharmacy',
+      'farmacias'      : 'pharmacy',
+      'banco'          : 'bank',
+      'cajero'         : 'atm',
+      'taller'         : 'car repair',
+      'llantera'       : 'tire shop',
+      'estacionamiento': 'parking',
+      'cafe'           : 'cafe',
+      'mall'           : 'mall',
     };
 
-    final qLower = query.toLowerCase().trim();
-    final osmTag  = semanticTags[qLower];
+    final mapboxQuery = semanticMapbox[qLower] ?? query;;
 
     // ── Helper: agrega elemento Overpass a results ────────
     void addOverpassElement(Map e, double userLat, double userLng) {
@@ -905,7 +893,7 @@ class _MotoGPSAppState extends State<MotoGPSApp> {
         final bboxMaxLat = (lat + delta).toStringAsFixed(6);
         final url =
             'https://api.mapbox.com/geocoding/v5/mapbox.places/'
-            '${Uri.encodeComponent(query)}.json'
+            '${Uri.encodeComponent(mapboxQuery)}.json'
             '?access_token=$_mapboxToken&language=es&limit=8'
             '&proximity=$lng,$lat'
             '&bbox=$bboxMinLng,$bboxMinLat,$bboxMaxLng,$bboxMaxLat'
@@ -1001,7 +989,7 @@ class _MotoGPSAppState extends State<MotoGPSApp> {
         try {
           final url =
               'https://api.mapbox.com/geocoding/v5/mapbox.places/'
-              '${Uri.encodeComponent(query)}.json'
+              '${Uri.encodeComponent(mapboxQuery)}.json'
               '?access_token=$_mapboxToken&language=es&limit=8'
               '&proximity=$lng,$lat'
               '&country=mx'
