@@ -620,6 +620,10 @@ class _MotoGPSAppState extends State<MotoGPSApp> {
           ),
           mapbox.MapAnimationOptions(duration: 1200, startDelay: 0),
         );
+        // ── Cargar gasolineras cercanas al primer fix GPS ──
+        Future.delayed(const Duration(milliseconds: 1500), () {
+          _fetchGasolineras(position.latitude, position.longitude);
+        });
         return;
       }
 
@@ -655,6 +659,75 @@ class _MotoGPSAppState extends State<MotoGPSApp> {
         }
       }
     });
+  }
+
+
+  // ── Gasolineras ───────────────────────────────────────
+  Future<void> _fetchGasolineras(double lat, double lng) async {
+    if (mapboxMap == null) return;
+    const double radius = 8000; // 8 km alrededor de la posición actual
+    final query =
+        '[out:json][timeout:25];\n'
+        '(\n'
+        '  node[amenity=fuel](around:$radius,$lat,$lng);\n'
+        '  way[amenity=fuel](around:$radius,$lat,$lng);\n'
+        ');\n'
+        'out center;\n';
+    try {
+      final response = await http.post(
+        Uri.parse('https://overpass-api.de/api/interpreter'),
+        body: query,
+      );
+      if (response.statusCode != 200) return;
+      final elements = json.decode(response.body)['elements'] as List;
+      final features = elements.map((e) {
+        final pLat = e['type'] == 'node'
+            ? (e['lat'] as num).toDouble()
+            : (e['center']?['lat'] as num?)?.toDouble() ?? 0.0;
+        final pLng = e['type'] == 'node'
+            ? (e['lon'] as num).toDouble()
+            : (e['center']?['lon'] as num?)?.toDouble() ?? 0.0;
+        if (pLat == 0.0 && pLng == 0.0) return null;
+        return {
+          'type': 'Feature',
+          'geometry': {'type': 'Point', 'coordinates': [pLng, pLat]},
+          'properties': {
+            'name': (e['tags']?['name'] as String?)
+                ?? (e['tags']?['brand'] as String?)
+                ?? 'Gasolinera',
+          },
+        };
+      }).whereType<Map>().toList();
+      if (!mounted) return;
+      await _updateGasolineraLayer(
+        json.encode({'type': 'FeatureCollection', 'features': features}),
+      );
+    } catch (_) {}
+  }
+
+  Future<void> _updateGasolineraLayer(String geoJson) async {
+    if (mapboxMap == null) return;
+    try {
+      final style = await mapboxMap!.style;
+      try { await style.removeStyleLayer('gasolineras-layer');  } catch (_) {}
+      try { await style.removeStyleSource('gasolineras-source'); } catch (_) {}
+      await style.addSource(mapbox.GeoJsonSource(
+        id: 'gasolineras-source',
+        data: geoJson,
+      ));
+      await style.addLayer(mapbox.SymbolLayer(
+        id:               'gasolineras-layer',
+        sourceId:         'gasolineras-source',
+        iconImage:        'fuel',
+        iconSize:         1.2,
+        iconAllowOverlap: false,
+        textField:        '{name}',
+        textSize:         10.0,
+        textOffset:       [0.0, 1.8],
+        textAllowOverlap: false,
+        textOptional:     true,
+      ));
+    } catch (_) {}
   }
 
   // ── Ruta ──────────────────────────────────────────────
