@@ -404,8 +404,9 @@ Future<void> _speak(String text) async {
 if (distToManeuver < 200 && distToManeuver >= 170) {
   final preview = _routeSteps[_currentStepIndex]['instruction'] as String;
   _speak('En 200 metros, $preview');
-}
-
+  }
+    
+ }
   // ── Tap mapa ──────────────────────────────────────────
   void _onMapTap(mapbox.MapContentGestureContext context) {
     if (_navigating) return;
