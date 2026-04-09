@@ -171,8 +171,13 @@ Future<void> _searchPlaces(String query) async {
   }
   setState(() => _searchLoading = true);
   try {
-    // Tipos permitidos: lugar, localidad, vecindario, calle, colonia
     const types = 'place,locality,neighborhood,address,district';
+
+    // Usar posición actual como punto de proximidad
+    final proximity = _currentPosition != null
+        ? '&proximity=${_currentPosition!.longitude},${_currentPosition!.latitude}'
+        : '';
+
     final url =
         'https://api.mapbox.com/geocoding/v5/mapbox.places/'
         '${Uri.encodeComponent(query)}.json'
@@ -180,16 +185,32 @@ Future<void> _searchPlaces(String query) async {
         '&language=es'
         '&country=MX'
         '&types=$types'
-        '&limit=7';
+        '&limit=7'
+        '$proximity';   // ← prioriza resultados cercanos a ti
+
     final response = await http.get(Uri.parse(url));
     if (response.statusCode == 200) {
       final features = json.decode(response.body)['features'] as List;
       setState(() {
-        _searchResults = features.map((f) => {
-          'name':      f['text'] as String,
-          'full_name': f['place_name'] as String,
-          'lat':       (f['center'][1] as num).toDouble(),
-          'lng':       (f['center'][0] as num).toDouble(),
+        _searchResults = features.map((f) {
+          // Extraer coordenadas del bbox central si existe, sino usar center
+          final center = f['center'] as List;
+          double lat = (center[1] as num).toDouble();
+          double lng = (center[0] as num).toDouble();
+
+          // Si tiene bbox, usar el centro real del bbox para mayor precisión
+          if (f['bbox'] != null) {
+            final bbox = f['bbox'] as List;
+            lng = ((bbox[0] as num) + (bbox[2] as num)) / 2;
+            lat = ((bbox[1] as num) + (bbox[3] as num)) / 2;
+          }
+
+          return {
+            'name':      f['text'] as String,
+            'full_name': f['place_name'] as String,
+            'lat':       lat,
+            'lng':       lng,
+          };
         }).toList();
       });
     }
