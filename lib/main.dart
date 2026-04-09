@@ -589,7 +589,7 @@ class _MotoGPSAppState extends State<MotoGPSApp> {
       final response = await http.get(Uri.parse(
         'https://api.mapbox.com/directions/v5/mapbox/driving/'
         '${_currentPosition!.longitude},${_currentPosition!.latitude};$destLng,$destLat'
-        '?geometries=geojson&access_token=$_mapboxToken&language=es&overview=full',
+        '?geometries=geojson&steps=true&access_token=$_mapboxToken&language=es&overview=full',
       ));
       if (response.statusCode == 200) {
         final data   = json.decode(response.body);
@@ -604,7 +604,19 @@ class _MotoGPSAppState extends State<MotoGPSApp> {
           _routeDuration    = '${((route['duration'] as double)/60).round()} min';
           _routeDrawn       = true;
           _routeCoordinates = coords;
-        });
+          _routeSteps = (route['legs'][0]['steps'] as List)
+                 .map((s) => {
+                       'instruction': (s['maneuver']['instruction'] as String?) ?? '',
+                       'distance':    (s['distance'] as num).toDouble(),
+                       'location':    s['maneuver']['location'] as List,
+                     })
+                 .toList();
+             _currentStepIndex   = 0;
+             _currentInstruction = _routeSteps.isNotEmpty
+                 ? _routeSteps[0]['instruction'] as String : '';
+             _distanceToNextManeuver = _routeSteps.isNotEmpty
+                 ? _routeSteps[0]['distance'] as double : 0.0;
+           });
         await _drawRouteOnMap(geometry);
         _fitRouteBounds(destLat, destLng);
       }
@@ -658,21 +670,6 @@ class _MotoGPSAppState extends State<MotoGPSApp> {
       _routeDistance = ''; _routeDuration = ''; _routeCoordinates = [];
     });
   }
-
-_routeSteps = (route['legs'][0]['steps'] as List)
-    .map((s) => {
-          'instruction': (s['maneuver']['instruction'] as String?) ?? '',
-          'distance':    (s['distance'] as num).toDouble(),
-          'location':    s['maneuver']['location'] as List,
-        })
-    .toList();
-_currentStepIndex   = 0;
-_currentInstruction = _routeSteps.isNotEmpty
-    ? _routeSteps[0]['instruction'] as String
-    : '';
-_distanceToNextManeuver = _routeSteps.isNotEmpty
-    ? _routeSteps[0]['distance'] as double
-    : 0.0;
   
   void _startNavigation() {
     setState(() => _navigating = true);
