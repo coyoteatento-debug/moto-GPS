@@ -444,7 +444,7 @@ class _MotoGPSAppState extends State<MotoGPSApp> {
           ),
           mapbox.MapAnimationOptions(duration: 1200, startDelay: 0),
         );
-        Future.delayed(const Duration(milliseconds: 1500), () {
+        Future.delayed(const Duration(milliseconds: 2000), () {
           _fetchGasolineras(position.latitude, position.longitude);
         });
         return;
