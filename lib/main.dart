@@ -998,7 +998,6 @@ IconData _maneuverIcon(String instruction) {
       ],
     );
   }
-}
 
   Widget _buildMapTab() {
   return Stack(
