@@ -998,6 +998,7 @@ IconData _maneuverIcon(String instruction) {
       ],
     );
   }
+}
 
   Widget _buildMapTab() {
   return Stack(
@@ -1427,3 +1428,6 @@ if (_navigating && _currentInstruction.isNotEmpty)
           _buildTripBook(), // índice 1 — Libro de viaje
         ],
       ),
+    );
+   }     
+  } 
