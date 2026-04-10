@@ -26,12 +26,14 @@ class TripRecord {
   final double distanceKm;
   final int durationMin;
   final DateTime date;
+  final List<List<double>> routeCoords;
 
   TripRecord({
     required this.destination,
     required this.distanceKm,
     required this.durationMin,
     required this.date,
+    this.routeCoords = const [],
   });
 
   Map<String, dynamic> toJson() => {
@@ -39,6 +41,7 @@ class TripRecord {
     'distanceKm': distanceKm,
     'durationMin': durationMin,
     'date': date.toIso8601String(),
+    'routeCoords': routeCoords,
   };
 
   factory TripRecord.fromJson(Map<String, dynamic> j) => TripRecord(
@@ -46,6 +49,9 @@ class TripRecord {
     distanceKm: (j['distanceKm'] as num).toDouble(),
     durationMin: j['durationMin'],
     date: DateTime.parse(j['date']),
+    routeCoords: (j['routeCoords'] as List? ?? [])
+        .map((c) => (c as List).map((v) => (v as num).toDouble()).toList())
+        .toList(),
   );
 }
 
@@ -258,12 +264,13 @@ class _MotoGPSAppState extends State<MotoGPSApp> {
   Future<void> _finishAndSaveTrip() async {
     if (_tripStartTime == null) return;
     final duration = DateTime.now().difference(_tripStartTime!);
-    final record   = TripRecord(
+    final record = TripRecord(
       destination: _selectedPlace?['name'] ?? 'Destino',
       distanceKm:  double.parse(
           (_tripAccumulatedDistance / 1000).toStringAsFixed(2)),
       durationMin: duration.inMinutes,
       date:        _tripStartTime!,
+      routeCoords: List<List<double>>.from(_routeCoordinates), // ← AGREGAR
     );
     setState(() => _trips.insert(0, record));
     await _saveTrips();
@@ -900,6 +907,60 @@ class _MotoGPSAppState extends State<MotoGPSApp> {
       ),
     );
   }
+
+Future<void> _showTripRoute(TripRecord trip) async {
+    if (trip.routeCoords.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+        content: Text('Este viaje no tiene ruta guardada'),
+        backgroundColor: Colors.orange,
+      ));
+      return;
+    }
+    // Cambiar a tab mapa
+    setState(() {
+      _currentTabIndex = 0;
+      _routeCoordinates = trip.routeCoords;
+      _routeDrawn = true;
+      _selectedPlace = {'name': trip.destination};
+      _routeDistance = '${trip.distanceKm} km';
+      _routeDuration = '${trip.durationMin} min';
+    });
+    // Dibujar ruta en mapa
+    await Future.delayed(const Duration(milliseconds: 400));
+    if (mapboxMap == null) return;
+    try {
+      final style = await mapboxMap!.style;
+      try { await style.removeStyleLayer('route-layer');  } catch (_) {}
+      try { await style.removeStyleSource('route-source'); } catch (_) {}
+      await style.addSource(mapbox.GeoJsonSource(
+        id: 'route-source',
+        data: json.encode({
+          'type': 'Feature',
+          'geometry': {'type': 'LineString', 'coordinates': trip.routeCoords},
+        }),
+      ));
+      await style.addLayer(mapbox.LineLayer(
+        id: 'route-layer', sourceId: 'route-source',
+        lineColor: 0xFF9C27B0, lineWidth: 5.0,
+        lineCap: mapbox.LineCap.ROUND, lineJoin: mapbox.LineJoin.ROUND,
+      ));
+    } catch (_) {}
+    // Centrar cámara en la ruta
+    final mid = trip.routeCoords[trip.routeCoords.length ~/ 2];
+    final dist = _distanceBetween(
+      trip.routeCoords.first[1], trip.routeCoords.first[0],
+      trip.routeCoords.last[1],  trip.routeCoords.last[0],
+    );
+    double zoom = dist < 5000 ? 13.0 : dist < 20000 ? 11.0
+        : dist < 80000 ? 9.0 : dist < 200000 ? 7.5 : 6.0;
+    mapboxMap?.flyTo(
+      mapbox.CameraOptions(
+        center: mapbox.Point(coordinates: mapbox.Position(mid[0], mid[1])),
+        zoom: zoom, bearing: 0.0, pitch: 0.0,
+      ),
+      mapbox.MapAnimationOptions(duration: 1500, startDelay: 0),
+    );
+  }
   
   // ── Libro de viajes UI ────────────────────────────────
   Widget _buildTripBook() {
@@ -940,7 +1001,9 @@ class _MotoGPSAppState extends State<MotoGPSApp> {
                     '${trip.date.year}  '
                     '${trip.date.hour.toString().padLeft(2, '0')}:'
                     '${trip.date.minute.toString().padLeft(2, '0')}';
-                return Container(
+                return GestureDetector(
+                  onTap: () => _showTripRoute(trip),
+                  child: Container(
                   margin: const EdgeInsets.only(bottom: 14),
                   decoration: BoxDecoration(
                     color: Colors.white,
@@ -981,7 +1044,8 @@ class _MotoGPSAppState extends State<MotoGPSApp> {
                       ],
                     ),
                   ),
-                );
+                ),
+              );
               },
             ),
     );
