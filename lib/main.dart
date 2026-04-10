@@ -97,6 +97,7 @@ class _MotoGPSAppState extends State<MotoGPSApp> {
   List<List<double>> _routeCoordinates = [];
 
   bool _userIsExploring    = false;
+  bool _isSatellite        = false;
   bool _isProgrammaticMove = false;
   bool _initialLocationSet = false;
 
@@ -1089,6 +1090,35 @@ class _MotoGPSAppState extends State<MotoGPSApp> {
             ),
           ),
 
+// ── Botón satélite ─────────────────────
+        if (!_navigating)
+          Positioned(
+            top: 50, left: 16,
+            child: GestureDetector(
+              onTap: () async {
+                setState(() => _isSatellite = !_isSatellite);
+                await mapboxMap?.loadStyleURI(
+                  _isSatellite
+                      ? 'mapbox://styles/mapbox/satellite-streets-v12'
+                      : 'mapbox://styles/mapbox/streets-v12',
+                );
+                if (!_isSatellite) await _applyCustomRoadStyle();
+              },
+              child: Container(
+                width: 46, height: 46,
+                decoration: BoxDecoration(
+                  color: _isSatellite ? Colors.blue[700] : Colors.white,
+                  borderRadius: BorderRadius.circular(12),
+                  boxShadow: const [
+                    BoxShadow(color: Colors.black38, blurRadius: 8, offset: Offset(0, 2)),
+                  ],
+                ),
+                child: Icon(Icons.satellite_alt,
+                    color: _isSatellite ? Colors.white : Colors.blue, size: 24),
+              ),
+            ),
+          ),
+        
         // ── Confirmar tap ──────────────────────
         if (_showTapConfirm && !_navigating)
           Positioned(
