@@ -555,11 +555,17 @@ class _MotoGPSAppState extends State<MotoGPSApp> {
   void _startLocationTracking() {
     Geolocator.getPositionStream(
       locationSettings: const LocationSettings(
-        accuracy: LocationAccuracy.bestForNavigation, distanceFilter: 2),
+        accuracy: LocationAccuracy.bestForNavigation, distanceFilter: 0),
     ).listen((Position position) {
       if (!mounted) return;
-      setState(() { _currentSpeed = position.speed * 3.6; _currentPosition = position; });
-
+      setState(() {
+        _currentSpeed = position.speed * 3.6;
+        _currentPosition = position;
+        // Si el usuario se mueve, retomar seguimiento automático
+        if (_currentSpeed > 2 && !_navigating && !_routeDrawn) {
+          _userIsExploring = false;
+        }
+      });
       if (!_initialLocationSet) {
         _initialLocationSet = true;
         _isProgrammaticMove = true;
@@ -604,12 +610,16 @@ class _MotoGPSAppState extends State<MotoGPSApp> {
         _updateMotoMarker(position.latitude, position.longitude, position.heading);
         if (!_routeDrawn && !_showTapConfirm && !_userIsExploring) {
           _isProgrammaticMove = true;
-          mapboxMap?.setCamera(mapbox.CameraOptions(
-            center: mapbox.Point(coordinates: mapbox.Position(
-                position.longitude, position.latitude)),
-            zoom: _calculateDynamicZoom(_currentSpeed),
-            bearing: position.heading,
-          ));
+          mapboxMap?.flyTo(
+            mapbox.CameraOptions(
+              center: mapbox.Point(coordinates: mapbox.Position(
+                  position.longitude, position.latitude)),
+              zoom: _calculateDynamicZoom(_currentSpeed),
+              bearing: position.heading,
+              pitch: 0.0,
+            ),
+            mapbox.MapAnimationOptions(duration: 800, startDelay: 0),
+          );
         }
       }
     });
