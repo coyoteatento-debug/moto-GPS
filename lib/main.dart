@@ -180,7 +180,7 @@ class _MotoGPSAppState extends State<MotoGPSApp> {
           '${Uri.encodeComponent(query)}.json'
           '?access_token=$_mapboxToken'
           '&language=es'
-          '&country=MX'
+          '&country=MX,US'
           '&types=$types'
           '&limit=7'
           '$proximity';
@@ -217,6 +217,14 @@ class _MotoGPSAppState extends State<MotoGPSApp> {
       _selectedPlace = place;
     });
     await _addDestinationMarker(lat, lng);
+    // Mover cámara al destino SIEMPRE, independiente de si la ruta funciona
+    mapboxMap?.flyTo(
+      mapbox.CameraOptions(
+        center: mapbox.Point(coordinates: mapbox.Position(lng, lat)),
+        zoom: 12.0, bearing: 0.0, pitch: 0.0,
+      ),
+      mapbox.MapAnimationOptions(duration: 1200, startDelay: 0),
+    );
     await _getRoute(lat, lng);
   }
   
@@ -680,7 +688,7 @@ class _MotoGPSAppState extends State<MotoGPSApp> {
       final response = await http.get(Uri.parse(
         'https://api.mapbox.com/directions/v5/mapbox/driving/'
         '${_currentPosition!.longitude},${_currentPosition!.latitude};$destLng,$destLat'
-        '?geometries=geojson&steps=true&access_token=$_mapboxToken&language=es&overview=full',
+        '?geometries=geojson&steps=true&access_token=$_mapboxToken&language=es&overview=full&continue_straight=true',
       ));
       if (response.statusCode == 200) {
         final data   = json.decode(response.body);
