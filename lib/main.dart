@@ -699,8 +699,8 @@ class _MotoGPSAppState extends State<MotoGPSApp> {
         final coords   = (geometry['coordinates'] as List)
             .map((c) => [c[0] as double, c[1] as double]).toList();
         setState(() {
-          _routeDistance    = '${((route['distance'] as double)/1000).toStringAsFixed(1)} km';
-          _routeDuration    = '${((route['duration'] as double)/60).round()} min';
+          _routeDistance = '${((route['distance'] as num).toDouble()/1000).toStringAsFixed(1)} km';
+          _routeDuration = '${((route['duration'] as num).toDouble()/60).round()} min';
           _routeDrawn       = true;
           _routeCoordinates = coords;
           _routeSteps = (route['legs'][0]['steps'] as List)
@@ -719,8 +719,11 @@ class _MotoGPSAppState extends State<MotoGPSApp> {
         await _drawRouteOnMap(geometry);
         _fitRouteBounds(destLat, destLng);
       }
-    } catch (_) {}
-  }
+    } catch (e) {
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Error ruta: $e'), backgroundColor: Colors.red),
+      );
+    }
 
   Future<void> _drawRouteOnMap(Map<String, dynamic> geometry) async {
     final style = await mapboxMap!.style;
