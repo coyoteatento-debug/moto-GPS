@@ -768,12 +768,12 @@ if (distToManeuver < 200 && distToManeuver >= 170) {
       await annotationManager!.delete(destinationAnnotation!);
       destinationAnnotation = null;
     }
+    await _tts.stop();
+    _lastSpokenInstruction = '';
     setState(() {
       _selectedPlace = null; _routeDrawn = false; _navigating = false;
       _showTapConfirm = false; _tappedLat = null; _tappedLng = null;
       _routeDistance = ''; _routeDuration = ''; _routeCoordinates = [];
-      _tts.stop();
-      _lastSpokenInstruction = '';
     });
   }
   
@@ -1425,7 +1425,5 @@ if (_navigating && _currentInstruction.isNotEmpty)
           _buildMapTab(),   // índice 0 — Mapa
           _buildTripBook(), // índice 1 — Libro de viaje
         ],
-      ),
     );
-  }     
-} 
+  }      
