@@ -18,7 +18,7 @@ def mapboxToken = localProperties['MAPBOX_TOKEN'] ?: System.getenv('MAPBOX_TOKEN
 
 android {
     namespace "com.example.moto_gps"
-    compileSdk 34
+    compileSdk 35
     compileOptions {
         sourceCompatibility JavaVersion.VERSION_17
         targetCompatibility JavaVersion.VERSION_17
@@ -30,7 +30,7 @@ android {
     defaultConfig {
         applicationId "com.example.moto_gps"
         minSdkVersion 24
-        targetSdkVersion 34
+        targetSdkVersion 35
         versionCode 1
         versionName "1.0"
         multiDexEnabled true
