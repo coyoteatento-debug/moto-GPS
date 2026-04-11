@@ -178,7 +178,7 @@ class _MotoGPSAppState extends State<MotoGPSApp> {
     final picked = await picker.pickImage(source: ImageSource.gallery, imageQuality: 85);
     if (picked == null) return;
     final bytes = await picked.readAsBytes();
-    final circular = await _makeCircularImage(bytes, 120);
+    final circular = await _makeCircularImage(bytes, 70);
     // Guardar en SharedPreferences
     final prefs = await SharedPreferences.getInstance();
     await prefs.setString('user_avatar', base64Encode(circular));
@@ -597,11 +597,23 @@ class _MotoGPSAppState extends State<MotoGPSApp> {
   Future<void> _updateMotoMarker(double lat, double lng, double bearing) async {
     final markerImage = _userAvatarImage ?? pinImage;
     if (annotationManager == null || markerImage == null) return;
+    // Si ya existe el marcador con avatar, solo actualizar posición/rotación
+    if (motoAnnotation != null && _userAvatarImage != null) {
+      motoAnnotation!.geometry = mapbox.Point(
+          coordinates: mapbox.Position(lng, lat));
+      motoAnnotation!.iconRotate = 0.0;
+      await annotationManager!.update(motoAnnotation!);
+      return;
+    }
     if (motoAnnotation == null) {
       motoAnnotation = await annotationManager!.create(mapbox.PointAnnotationOptions(
         geometry: mapbox.Point(coordinates: mapbox.Position(lng, lat)),
         image: markerImage, iconSize: 1.2,
-        iconAnchor: mapbox.IconAnchor.CENTER, iconRotate: bearing,
+        iconAnchor: mapbox.IconAnchor.CENTER,
+        iconRotate: _userAvatarImage != null ? 0.0 : bearing,
+        iconRotationAlignment: _userAvatarImage != null
+            ? mapbox.IconRotationAlignment.VIEWPORT
+            : mapbox.IconRotationAlignment.MAP,
       ));
     } else {
       motoAnnotation!.geometry = mapbox.Point(coordinates: mapbox.Position(lng, lat));
