@@ -593,7 +593,7 @@ class _MotoGPSAppState extends State<MotoGPSApp> {
     }
 
     // Aviso anticipado a 200 m
-    if (distToManeuver < 200 && distToManeuver >= 170) {
+    if (distToManeuver < 80 && distToManeuver >= 60) {
       final preview = _routeSteps[_currentStepIndex]['instruction'] as String;
       _speak('En 200 metros, $preview');
     }
