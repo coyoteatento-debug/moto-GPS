@@ -1238,7 +1238,7 @@ Future<void> _showTripRoute(TripRecord trip) async {
           ),
 
 // ── Botón avatar ───────────────────────
-        if (!_navigating)
+        if (!_navigating && !_showSearch)
           Positioned(
             top: 106, right: 16,
             child: GestureDetector(
@@ -1269,7 +1269,7 @@ Future<void> _showTripRoute(TripRecord trip) async {
 // ── Botón satélite ─────────────────────
         if (!_navigating)
           Positioned(
-            top: 50, left: 16,
+            bottom: 170, right: 16,
             child: GestureDetector(
               onTap: () async {
                 setState(() => _isSatellite = !_isSatellite);
