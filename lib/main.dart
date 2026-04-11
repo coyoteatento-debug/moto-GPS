@@ -611,9 +611,6 @@ class _MotoGPSAppState extends State<MotoGPSApp> {
         image: markerImage, iconSize: 1.2,
         iconAnchor: mapbox.IconAnchor.CENTER,
         iconRotate: _userAvatarImage != null ? 0.0 : bearing,
-        iconRotationAlignment: _userAvatarImage != null
-            ? mapbox.IconRotationAlignment.VIEWPORT
-            : mapbox.IconRotationAlignment.MAP,
       ));
     } else {
       motoAnnotation!.geometry = mapbox.Point(coordinates: mapbox.Position(lng, lat));
