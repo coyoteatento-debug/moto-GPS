@@ -280,7 +280,9 @@ class _MotoGPSAppState extends State<MotoGPSApp> {
   Future<void> _speak(String text) async {
     if (text.isEmpty || text == _lastSpokenInstruction) return;
     _lastSpokenInstruction = text;
-    await _tts.stop();
+    // Esperar a que termine antes de hablar
+    final isPlaying = await _tts.isSpeaking;
+    if (isPlaying == true) return; // no interrumpir si está hablando
     await _tts.speak(text);
   }
 
@@ -580,22 +582,27 @@ class _MotoGPSAppState extends State<MotoGPSApp> {
 
     setState(() => _distanceToNextManeuver = distToManeuver);
 
-    // Avanza al siguiente paso si estás a menos de 30 m
-    if (distToManeuver < 30 && _currentStepIndex < _routeSteps.length - 1) {
-      _currentStepIndex++;
-      final next  = _routeSteps[_currentStepIndex];
-      final instr = next['instruction'] as String;
-      setState(() {
-        _currentInstruction     = instr;
-        _distanceToNextManeuver = next['distance'] as double;
-      });
+    // Aviso anticipado a ~150m antes de la maniobra
+    if (distToManeuver < 150 && distToManeuver >= 120) {
+      final instr = _routeSteps[_currentStepIndex]['instruction'] as String;
+      _speak('En 150 metros, $instr');
+    }
+
+    // Aviso cercano a ~50m
+    if (distToManeuver < 50 && distToManeuver >= 30) {
+      final instr = _routeSteps[_currentStepIndex]['instruction'] as String;
       _speak(instr);
     }
 
-    // Aviso anticipado a 200 m
-    if (distToManeuver < 80 && distToManeuver >= 60) {
-      final preview = _routeSteps[_currentStepIndex]['instruction'] as String;
-      _speak('En 200 metros, $preview');
+    // Avanza al siguiente paso al pasar la maniobra
+    if (distToManeuver < 15 && _currentStepIndex < _routeSteps.length - 1) {
+      _currentStepIndex++;
+      final next = _routeSteps[_currentStepIndex];
+      setState(() {
+        _currentInstruction     = next['instruction'] as String;
+        _distanceToNextManeuver = next['distance'] as double;
+      });
+      // NO hablar aquí — el aviso vendrá cuando se acerque
     }
   }
 
