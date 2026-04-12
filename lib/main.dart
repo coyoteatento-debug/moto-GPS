@@ -152,6 +152,7 @@ class _MotoGPSAppState extends State<MotoGPSApp> {
 
   bool _userIsExploring    = false;
   bool _isSatellite        = false;
+  bool _gasolinerasVisible = false;
   bool _isProgrammaticMove = false;
   bool _initialLocationSet = false;
 
@@ -713,13 +714,6 @@ class _MotoGPSAppState extends State<MotoGPSApp> {
           ),
           mapbox.MapAnimationOptions(duration: 1200, startDelay: 0),
         );
-        Future.delayed(const Duration(milliseconds: 3500), () {
-          _fetchGasolineras(position.latitude, position.longitude);
-        });
-        // Reintento por si falla la primera vez
-        Future.delayed(const Duration(milliseconds: 8000), () {
-          if (mounted) _fetchGasolineras(position.latitude, position.longitude);
-        });
         return;
       }
 
@@ -1353,6 +1347,48 @@ void _showTripRoute(TripRecord trip) {
                 child: _userAvatarImage == null
                     ? const Icon(Icons.person_add, color: Colors.blue, size: 22)
                     : null,
+              ),
+            ),
+          ),
+
+// ── Botón gasolineras ──────────────────
+        if (!_navigating)
+          Positioned(
+            bottom: 230, right: 16,
+            child: GestureDetector(
+              onTap: () async {
+                if (_currentPosition == null) return;
+                if (_gasolinerasVisible) {
+                  // Ocultar — remover layer
+                  try {
+                    final style = await mapboxMap!.style;
+                    try { await style.removeStyleLayer('gasolineras-layer');  } catch (_) {}
+                    try { await style.removeStyleSource('gasolineras-source'); } catch (_) {}
+                  } catch (_) {}
+                  setState(() => _gasolinerasVisible = false);
+                } else {
+                  // Mostrar
+                  await _fetchGasolineras(
+                    _currentPosition!.latitude,
+                    _currentPosition!.longitude,
+                  );
+                  setState(() => _gasolinerasVisible = true);
+                }
+              },
+              child: Container(
+                width: 46, height: 46,
+                decoration: BoxDecoration(
+                  color: _gasolinerasVisible ? Colors.orange[700] : Colors.white,
+                  borderRadius: BorderRadius.circular(12),
+                  boxShadow: const [
+                    BoxShadow(color: Colors.black38, blurRadius: 8, offset: Offset(0, 2)),
+                  ],
+                ),
+                child: Icon(
+                  Icons.local_gas_station,
+                  color: _gasolinerasVisible ? Colors.white : Colors.orange[700],
+                  size: 24,
+                ),
               ),
             ),
           ),
