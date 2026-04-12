@@ -708,8 +708,12 @@ class _MotoGPSAppState extends State<MotoGPSApp> {
           ),
           mapbox.MapAnimationOptions(duration: 1200, startDelay: 0),
         );
-        Future.delayed(const Duration(milliseconds: 2000), () {
+        Future.delayed(const Duration(milliseconds: 3500), () {
           _fetchGasolineras(position.latitude, position.longitude);
+        });
+        // Reintento por si falla la primera vez
+        Future.delayed(const Duration(milliseconds: 8000), () {
+          if (mounted) _fetchGasolineras(position.latitude, position.longitude);
         });
         return;
       }
@@ -760,7 +764,7 @@ class _MotoGPSAppState extends State<MotoGPSApp> {
     if (mapboxMap == null) return;
     const double radius = 8000;
     final query =
-        '[out:json][timeout:25];\n'
+        '[out:json][timeout:40];\n'
         '(\n'
         '  node[amenity=fuel](around:$radius,$lat,$lng);\n'
         '  way[amenity=fuel](around:$radius,$lat,$lng);\n'
@@ -1361,7 +1365,14 @@ void _showTripRoute(TripRecord trip) {
                       : 'mapbox://styles/mapbox/streets-v12',
                 );
                 if (!_isSatellite) await _applyCustomRoadStyle();
-              },
+                // Restaurar gasolineras tras cambio de estilo
+                await Future.delayed(const Duration(milliseconds: 1500));
+                if (_currentPosition != null && mounted) {
+                  _fetchGasolineras(
+                    _currentPosition!.latitude,
+                    _currentPosition!.longitude,
+                  );
+                }
               child: Container(
                 width: 46, height: 46,
                 decoration: BoxDecoration(
