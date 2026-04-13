@@ -426,25 +426,35 @@ class _MotoGPSAppState extends State<MotoGPSApp> {
   Future<void> _applyCustomRoadStyle() async {
     if (mapboxMap == null) return;
     final style = await mapboxMap!.style;
+    // DEBUG — listar layers disponibles
+    try {
+      final layers = await style.getStyleLayers();
+      final ids = layers.map((l) => l.id).join('\n');
+      debugPrint('=== LAYERS DISPONIBLES ===\n$ids');
+    } catch (e) {
+      debugPrint('Error layers: $e');
+    }
 
     // Mapa de layers con sus colores
     final Map<String, String> lineColors = {
-      // Autopistas — naranja intenso
-      'road-motorway-trunk':      '#FF5500',
-      'road-motorway-trunk-case': '#CC3300',
-      // Primarias — amarillo brillante
-      'road-primary':             '#FFD700',
-      'road-primary-case':        '#CC9900',
-      // Secundarias
+      'road-motorway':                '#FF5500',
+      'road-motorway-case':           '#CC3300',
+      'road-trunk':                   '#FF5500',
+      'road-trunk-case':              '#CC3300',
+      'road-primary':                 '#FFD700',
+      'road-primary-case':            '#CC9900',
+      'road-secondary':               '#FFE033',
+      'road-secondary-case':          '#CC9900',
+      'road-tertiary':                '#FFE033',
+      'road-tertiary-case':           '#CC9900',
+      'road-street':                  '#FFFFFF',
+      'road-street-case':             '#DDDDDD',
+      'road-path':                    '#D9CEBC',
+      'road-pedestrian':              '#EDE8DC',
+      'road-motorway-trunk':          '#FF5500',
+      'road-motorway-trunk-case':     '#CC3300',
       'road-secondary-tertiary':      '#FFE033',
       'road-secondary-tertiary-case': '#CC9900',
-      // Calles
-      'road-street':      '#FFFFFF',
-      'road-street-low':  '#FFFFFF',
-      'road-street-case': '#DDDDDD',
-      // Peatonal
-      'road-path':       '#D9CEBC',
-      'road-pedestrian': '#EDE8DC',
     };
 
     for (final entry in lineColors.entries) {
