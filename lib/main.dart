@@ -425,7 +425,8 @@ class _MotoGPSAppState extends State<MotoGPSApp> with TickerProviderStateMixin {
     annotationManager = await map.annotations.createPointAnnotationManager();
     await Future.delayed(const Duration(milliseconds: 600));
     await _applyCustomRoadStyle();
-
+  }
+  
   // ── Estilo de carreteras tipo Riser ───────────────────
   Future<void> _applyCustomRoadStyle() async {
   if (mapboxMap == null) return;
@@ -481,7 +482,7 @@ class _MotoGPSAppState extends State<MotoGPSApp> with TickerProviderStateMixin {
       );
     } catch (_) {}
   }
-
+    
   // Fondo beige cálido
   for (final bg in ['land', 'background', 'landcover']) {
     try {
