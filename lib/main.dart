@@ -10,7 +10,6 @@ import 'dart:math';
 import 'dart:async';
 import 'package:http/http.dart' as http;
 import 'dart:ui' as ui;
-import 'package:latlong2/latlong.dart';
 import 'package:flutter_tts/flutter_tts.dart';
 import 'package:image_picker/image_picker.dart';
 
@@ -117,7 +116,8 @@ class _MotoGPSAppState extends State<MotoGPSApp> with TickerProviderStateMixin {
   mapbox.PointAnnotation? motoAnnotation;
   mapbox.PointAnnotation? destinationAnnotation;
   AnimationController? _markerAnimController;
-  LatLng? _lastAnimatedPosition;
+  double? _lastAnimatedLat;
+  double? _lastAnimatedLng;
 
   Uint8List? pinImage;
   Uint8List? _userAvatarImage;
@@ -716,8 +716,8 @@ void _checkRouteDeviation(double lat, double lng) {
   }
 
 void _animateMarkerTo(double targetLat, double targetLng, double bearing) {
-    final double fromLat = _lastAnimatedPosition?.latitude  ?? targetLat;
-    final double fromLng = _lastAnimatedPosition?.longitude ?? targetLng;
+    final double fromLat = _lastAnimatedLat ?? targetLat;
+    final double fromLng = _lastAnimatedLng ?? targetLng;
 
     _markerAnimController?.stop();
     _markerAnimController?.dispose();
@@ -737,7 +737,8 @@ void _animateMarkerTo(double targetLat, double targetLng, double bearing) {
 
     _markerAnimController!.addStatusListener((status) {
       if (status == AnimationStatus.completed) {
-        _lastAnimatedPosition = LatLng(targetLat, targetLng);
+        _lastAnimatedLat = targetLat;
+        _lastAnimatedLng = targetLng;
       }
     });
 
