@@ -1982,4 +1982,3 @@ void _showTripRoute(TripRecord trip) {
       ),
     );
   }
-}
