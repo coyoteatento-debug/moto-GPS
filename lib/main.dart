@@ -429,46 +429,69 @@ class _MotoGPSAppState extends State<MotoGPSApp> with TickerProviderStateMixin {
 
   // ── Estilo de carreteras tipo Riser ───────────────────
   Future<void> _applyCustomRoadStyle() async {
-    if (mapboxMap == null) return;
-    final style = await mapboxMap!.style;
-    // DEBUG — listar layers disponibles
+  if (mapboxMap == null) return;
+  final style = await mapboxMap!.style;
+
+  // Layer IDs reales de streets-v12 con colores estilo Calimoto iluminados
+  final Map<String, String> lineColors = {
+    // Autopistas
+    'road-motorway':                    '#F5780A',
+    'road-motorway-case':               '#C45500',
+    'road-motorway-link':               '#F5780A',
+    'road-motorway-link-case':          '#C45500',
+    // Tronco
+    'road-trunk':                       '#F5780A',
+    'road-trunk-case':                  '#C45500',
+    'road-trunk-link':                  '#F5780A',
+    'road-trunk-link-case':             '#C45500',
+    // Primarias
+    'road-primary':                     '#F7C521',
+    'road-primary-case':                '#D4A017',
+    'road-primary-link':                '#F7C521',
+    // Secundarias
+    'road-secondary':                   '#F5D040',
+    'road-secondary-case':              '#C8A820',
+    'road-secondary-link':              '#F5D040',
+    // Terciarias
+    'road-tertiary':                    '#F5D040',
+    'road-tertiary-case':               '#C8A820',
+    // Calles
+    'road-street':                      '#FAFAF5',
+    'road-street-case':                 '#E0DDD4',
+    'road-street-low':                  '#FAFAF5',
+    // Secundaria-terciaria combinada
+    'road-secondary-tertiary':          '#F5D040',
+    'road-secondary-tertiary-case':     '#C8A820',
+    // Motorway-trunk combinada
+    'road-motorway-trunk':              '#F5780A',
+    'road-motorway-trunk-case':         '#C45500',
+    // Peatonal y caminos
+    'road-pedestrian':                  '#F0EBE0',
+    'road-pedestrian-case':             '#E0DDD4',
+    'road-path':                        '#E8E2D0',
+    'road-path-bg':                     '#E0DDD4',
+    // Servicio
+    'road-service':                     '#FAFAF5',
+    'road-service-case':                '#E0DDD4',
+  };
+
+  for (final entry in lineColors.entries) {
     try {
-      final layers = await style.getStyleLayers();
-     final ids = layers.map((l) => l?.id ?? 'null').join('\n');
-      debugPrint('=== LAYERS DISPONIBLES ===\n$ids');
-    } catch (e) {
-      debugPrint('Error layers: $e');
-    }
+      await style.setStyleLayerProperty(
+        entry.key, 'line-color', json.encode(entry.value),
+      );
+    } catch (_) {}
+  }
 
-    // Mapa de layers con sus colores
-   final Map<String, String> lineColors = {
-  'road-motorway':                '#F2720A',  // naranja-rojo brillante
-  'road-motorway-case':           '#C45500',  // naranja oscuro borde
-  'road-trunk':                   '#F2720A',
-  'road-trunk-case':              '#C45500',
-  'road-primary':                 '#F7C521',  // amarillo dorado brillante
-  'road-primary-case':            '#D4A017',
-  'road-secondary':               '#F5D040',  // amarillo pálido brillante
-  'road-secondary-case':          '#C8A820',
-  'road-tertiary':                '#F5D040',
-  'road-tertiary-case':           '#C8A820',
-  'road-street':                  '#FAFAF5',  // blanco cálido
-  'road-street-case':             '#E8E4D8',
-  'road-path':                    '#E8E2D0',
-  'road-pedestrian':              '#F0EBE0',
-  'road-motorway-trunk':          '#F2720A',
-  'road-motorway-trunk-case':     '#C45500',
-  'road-secondary-tertiary':      '#F5D040',
-  'road-secondary-tertiary-case': '#C8A820',
-};
-
-    for (final entry in lineColors.entries) {
-      try {
-        await style.setStyleLayerProperty(
-          entry.key, 'line-color', json.encode(entry.value),
-        );
-      } catch (_) {}
-    }
+  // Fondo beige cálido
+  for (final bg in ['land', 'background', 'landcover']) {
+    try {
+      await style.setStyleLayerProperty(
+        bg, 'background-color', json.encode('#F0EDE4'),
+      );
+    } catch (_) {}
+  }
+}
 
     // Fondo del mapa
     try {
@@ -778,19 +801,18 @@ void _animateMarkerTo(double targetLat, double targetLng, double bearing) {
         }
       });
       if (!_initialLocationSet) {
-        _initialLocationSet = true;
-        _isProgrammaticMove = true;
-        mapboxMap?.flyTo(
-          mapbox.CameraOptions(
-            center: mapbox.Point(coordinates: mapbox.Position(
-              position.longitude, position.latitude,
-            )),
-            zoom: 15.0, bearing: position.heading, pitch: 0.0,
-          ),
-          mapbox.MapAnimationOptions(duration: 1200, startDelay: 0),
-        );
-        return;
-      }
+  _initialLocationSet = true;
+  _isProgrammaticMove = true;
+  mapboxMap?.flyTo(
+    mapbox.CameraOptions(
+      center: mapbox.Point(coordinates: mapbox.Position(
+        position.longitude, position.latitude,
+      )),
+      zoom: 15.0, bearing: position.heading, pitch: 0.0,
+    ),
+    mapbox.MapAnimationOptions(duration: 1200, startDelay: 0),
+  );
+}
 
       if (_navigating && _routeCoordinates.isNotEmpty) {
         final snapped    = _snapToRoute(position.latitude, position.longitude);
@@ -1367,7 +1389,7 @@ void _showTripRoute(TripRecord trip) {
           child: mapbox.MapWidget(
             key: const ValueKey("mapWidget"),
             onMapCreated: _onMapCreated,
-            styleUri: 'mapbox://styles/mapbox/light-v11',
+            styleUri: 'mapbox://styles/mapbox/streets-v12',
             onTapListener: _onMapTap,
             cameraOptions: mapbox.CameraOptions(zoom: 15.0, pitch: 0.0),
             onCameraChangeListener: (state) async {
@@ -1435,8 +1457,13 @@ void _showTripRoute(TripRecord trip) {
                     ),
                     mapbox.MapAnimationOptions(duration: 800, startDelay: 0),
                   );
-                }
-              },
+                  _updateMotoMarker(
+                   _currentPosition!.latitude,
+                   _currentPosition!.longitude,
+                   _currentPosition!.heading,
+                 );
+               }
+             },
               child: Container(
                 width: 46, height: 46,
                 decoration: BoxDecoration(
