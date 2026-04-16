@@ -426,6 +426,19 @@ class _MotoGPSAppState extends State<MotoGPSApp> with TickerProviderStateMixin {
     await Future.delayed(const Duration(milliseconds: 600));
     await _applyCustomRoadStyle();
   }
+
+  // Centrar en ubicación actual si ya se obtuvo
+if (_currentPosition != null) {
+  mapboxMap?.flyTo(
+    mapbox.CameraOptions(
+      center: mapbox.Point(coordinates: mapbox.Position(
+        _currentPosition!.longitude, _currentPosition!.latitude,
+      )),
+      zoom: 15.0, bearing: _currentPosition!.heading, pitch: 0.0,
+    ),
+    mapbox.MapAnimationOptions(duration: 1000, startDelay: 0),
+  );
+}
   
   // ── Estilo de carreteras tipo Riser ───────────────────
   Future<void> _applyCustomRoadStyle() async {
@@ -785,7 +798,7 @@ void _animateMarkerTo(double targetLat, double targetLng, double bearing) {
           _userIsExploring = false;
         }
       });
-      if (!_initialLocationSet) {
+      if (!_initialLocationSet && mapboxMap != null) {
   _initialLocationSet = true;
   _isProgrammaticMove = true;
   mapboxMap?.flyTo(
