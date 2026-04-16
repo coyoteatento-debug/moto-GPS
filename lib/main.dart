@@ -10,6 +10,7 @@ import 'dart:math';
 import 'dart:async';
 import 'package:http/http.dart' as http;
 import 'dart:ui' as ui;
+import 'package:latlong2/latlong.dart';
 import 'package:flutter_tts/flutter_tts.dart';
 import 'package:image_picker/image_picker.dart';
 
@@ -109,12 +110,14 @@ class MotoGPSApp extends StatefulWidget {
   State<MotoGPSApp> createState() => _MotoGPSAppState();
 }
 
-class _MotoGPSAppState extends State<MotoGPSApp> {
+class _MotoGPSAppState extends State<MotoGPSApp> with TickerProviderStateMixin {
 
   mapbox.MapboxMap? mapboxMap;
   mapbox.PointAnnotationManager? annotationManager;
   mapbox.PointAnnotation? motoAnnotation;
   mapbox.PointAnnotation? destinationAnnotation;
+  AnimationController? _markerAnimController;
+  LatLng? _lastAnimatedPosition;
 
   Uint8List? pinImage;
   Uint8List? _userAvatarImage;
@@ -156,6 +159,7 @@ class _MotoGPSAppState extends State<MotoGPSApp> {
   List<Map<String, dynamic>> _alternateRoutes = [];
   int _selectedRouteIndex = 0;
   bool _isRecalculating = false;
+  int _deviationCount = 0;
   DateTime? _lastRecalcTime;
   
   bool _isProgrammaticMove = false;
@@ -180,6 +184,7 @@ class _MotoGPSAppState extends State<MotoGPSApp> {
 
   @override
   void dispose() {
+    _markerAnimController?.dispose();
     _searchController.dispose();
     super.dispose();
   }
@@ -544,25 +549,42 @@ class _MotoGPSAppState extends State<MotoGPSApp> {
     } catch (_) {}
   }
 
+// REEMPLAZA todo el método:
 void _checkRouteDeviation(double lat, double lng) {
-    if (!_navigating || _routeCoordinates.isEmpty || _isRecalculating) return;
-    // Limitar recálculos — máximo 1 cada 15 segundos
-    if (_lastRecalcTime != null &&
-        DateTime.now().difference(_lastRecalcTime!).inSeconds < 15) return;
+  if (!_navigating || _routeCoordinates.isEmpty || _isRecalculating) return;
 
-    // Encontrar distancia mínima a la ruta
-    double minDist = double.infinity;
-    for (final coord in _routeCoordinates) {
-      final d = _distanceBetween(lat, lng, coord[1], coord[0]);
-      if (d < minDist) minDist = d;
-    }
+  // Cooldown: máximo 1 recálculo cada 20 segundos
+  if (_lastRecalcTime != null &&
+      DateTime.now().difference(_lastRecalcTime!).inSeconds < 20) return;
 
-    // Si está a más de 50m de la ruta → recalcular
-    if (minDist > 50) {
+  // Distancia mínima al segmento más cercano de la ruta
+  double minDist = double.infinity;
+  for (int i = 0; i < _routeCoordinates.length - 1; i++) {
+    final a = _routeCoordinates[i];
+    final b = _routeCoordinates[i + 1];
+    final abX = b[0] - a[0]; final abY = b[1] - a[1];
+    final apX = lng  - a[0]; final apY = lat  - a[1];
+    final ab2 = abX * abX + abY * abY;
+    if (ab2 == 0) continue;
+    final t = ((apX * abX + apY * abY) / ab2).clamp(0.0, 1.0);
+    final d = _distanceBetween(lat, lng, a[1] + t * abY, a[0] + t * abX);
+    if (d < minDist) minDist = d;
+  }
+
+  // Fuera de ruta → acumular lecturas consecutivas
+  if (minDist > 55) {
+    _deviationCount++;
+    // Solo recalcular si 3 lecturas seguidas confirman el desvío (~3 segundos)
+    if (_deviationCount >= 3) {
+      _deviationCount = 0;
       _lastRecalcTime = DateTime.now();
       _recalculateRoute(lat, lng);
     }
+  } else {
+    // Dentro de ruta → resetear contador
+    _deviationCount = 0;
   }
+}
 
   Future<void> _recalculateRoute(double lat, double lng) async {
     if (_selectedPlace == null) return;
@@ -693,11 +715,48 @@ void _checkRouteDeviation(double lat, double lng) {
     ));
   }
 
+void _animateMarkerTo(double targetLat, double targetLng, double bearing) {
+    final double fromLat = _lastAnimatedPosition?.latitude  ?? targetLat;
+    final double fromLng = _lastAnimatedPosition?.longitude ?? targetLng;
+
+    _markerAnimController?.stop();
+    _markerAnimController?.dispose();
+    _markerAnimController = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 850),
+    );
+
+    final animLat = Tween<double>(begin: fromLat, end: targetLat)
+        .animate(CurvedAnimation(parent: _markerAnimController!, curve: Curves.easeOut));
+    final animLng = Tween<double>(begin: fromLng, end: targetLng)
+        .animate(CurvedAnimation(parent: _markerAnimController!, curve: Curves.easeOut));
+
+    _markerAnimController!.addListener(() {
+      _updateMotoMarker(animLat.value, animLng.value, bearing);
+    });
+
+    _markerAnimController!.addStatusListener((status) {
+      if (status == AnimationStatus.completed) {
+        _lastAnimatedPosition = LatLng(targetLat, targetLng);
+      }
+    });
+
+    _markerAnimController!.forward();
+  }
+  
   // ── GPS Tracking ──────────────────────────────────────
   void _startLocationTracking() {
     Geolocator.getPositionStream(
-      locationSettings: const LocationSettings(
-        accuracy: LocationAccuracy.bestForNavigation, distanceFilter: 0),
+      locationSettings: AndroidSettings(
+        accuracy: LocationAccuracy.high,
+        distanceFilter: 2,
+        intervalDuration: const Duration(milliseconds: 1000),
+        foregroundNotificationConfig: const ForegroundNotificationConfig(
+          notificationText: 'MotoGPS activo',
+          notificationTitle: 'Navegación en curso',
+          enableWakeLock: true,
+        ),
+      ),
     ).listen((Position position) {
       if (!mounted) return;
       setState(() {
@@ -734,7 +793,7 @@ void _checkRouteDeviation(double lat, double lng) {
               _routeCoordinates[idx][1], _routeCoordinates[idx][0],
               _routeCoordinates[idx+1][1], _routeCoordinates[idx+1][0]);
         }
-        _updateMotoMarker(snappedLat, snappedLng, bearing);
+        _animateMarkerTo(snappedLat, snappedLng, bearing);
         _accumulateTripDistance(position);
         // Detectar desvío de ruta
         _checkRouteDeviation(position.latitude, position.longitude);
@@ -745,10 +804,10 @@ void _checkRouteDeviation(double lat, double lng) {
             center: mapbox.Point(coordinates: mapbox.Position(snappedLng, snappedLat)),
             zoom: 17.0, bearing: bearing, pitch: 50.0,
           ),
-          mapbox.MapAnimationOptions(duration: 1000, startDelay: 0),
+          mapbox.MapAnimationOptions(duration: 900, startDelay: 0),
         );
       } else {
-        _updateMotoMarker(position.latitude, position.longitude, position.heading);
+        _animateMarkerTo(position.latitude, position.longitude, position.heading);
         if (!_routeDrawn && !_showTapConfirm && !_userIsExploring) {
           _isProgrammaticMove = true;
           mapboxMap?.flyTo(
