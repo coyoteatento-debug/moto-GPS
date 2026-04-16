@@ -441,26 +441,26 @@ class _MotoGPSAppState extends State<MotoGPSApp> with TickerProviderStateMixin {
     }
 
     // Mapa de layers con sus colores
-    final Map<String, String> lineColors = {
-      'road-motorway':                '#FF5500',
-      'road-motorway-case':           '#CC3300',
-      'road-trunk':                   '#FF5500',
-      'road-trunk-case':              '#CC3300',
-      'road-primary':                 '#FFD700',
-      'road-primary-case':            '#CC9900',
-      'road-secondary':               '#FFE033',
-      'road-secondary-case':          '#CC9900',
-      'road-tertiary':                '#FFE033',
-      'road-tertiary-case':           '#CC9900',
-      'road-street':                  '#FFFFFF',
-      'road-street-case':             '#DDDDDD',
-      'road-path':                    '#D9CEBC',
-      'road-pedestrian':              '#EDE8DC',
-      'road-motorway-trunk':          '#FF5500',
-      'road-motorway-trunk-case':     '#CC3300',
-      'road-secondary-tertiary':      '#FFE033',
-      'road-secondary-tertiary-case': '#CC9900',
-    };
+   final Map<String, String> lineColors = {
+  'road-motorway':                '#F2720A',  // naranja-rojo brillante
+  'road-motorway-case':           '#C45500',  // naranja oscuro borde
+  'road-trunk':                   '#F2720A',
+  'road-trunk-case':              '#C45500',
+  'road-primary':                 '#F7C521',  // amarillo dorado brillante
+  'road-primary-case':            '#D4A017',
+  'road-secondary':               '#F5D040',  // amarillo pálido brillante
+  'road-secondary-case':          '#C8A820',
+  'road-tertiary':                '#F5D040',
+  'road-tertiary-case':           '#C8A820',
+  'road-street':                  '#FAFAF5',  // blanco cálido
+  'road-street-case':             '#E8E4D8',
+  'road-path':                    '#E8E2D0',
+  'road-pedestrian':              '#F0EBE0',
+  'road-motorway-trunk':          '#F2720A',
+  'road-motorway-trunk-case':     '#C45500',
+  'road-secondary-tertiary':      '#F5D040',
+  'road-secondary-tertiary-case': '#C8A820',
+};
 
     for (final entry in lineColors.entries) {
       try {
@@ -473,7 +473,7 @@ class _MotoGPSAppState extends State<MotoGPSApp> with TickerProviderStateMixin {
     // Fondo del mapa
     try {
       await style.setStyleLayerProperty(
-        'land', 'background-color', json.encode('#F5F0E8'),
+        'land', 'background-color', json.encode('#F0EDE4'),
       );
     } catch (_) {}
   }
@@ -1367,7 +1367,7 @@ void _showTripRoute(TripRecord trip) {
           child: mapbox.MapWidget(
             key: const ValueKey("mapWidget"),
             onMapCreated: _onMapCreated,
-            styleUri: 'mapbox://styles/mapbox/streets-v12',
+            styleUri: 'mapbox://styles/mapbox/light-v11',
             onTapListener: _onMapTap,
             cameraOptions: mapbox.CameraOptions(zoom: 15.0, pitch: 0.0),
             onCameraChangeListener: (state) async {
