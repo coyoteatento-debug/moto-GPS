@@ -1101,6 +1101,12 @@ void _animateMarkerTo(double targetLat, double targetLng, double bearing) {
     if (mapboxMap != null) {
       try {
         final style = await mapboxMap!.style;
+        // Borrar todas las capas indexadas (principal + alternas)
+        for (int i = 0; i < 5; i++) {
+          try { await style.removeStyleLayer('route-layer-$i');  } catch (_) {}
+          try { await style.removeStyleSource('route-source-$i'); } catch (_) {}
+        }
+        // Por compatibilidad, borrar también los IDs legacy sin índice
         try { await style.removeStyleLayer('route-layer');  } catch (_) {}
         try { await style.removeStyleSource('route-source'); } catch (_) {}
       } catch (_) {}
