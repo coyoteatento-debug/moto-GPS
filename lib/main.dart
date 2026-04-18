@@ -902,7 +902,6 @@ void _animateMarkerTo(double targetLat, double targetLng, double bearing) {
         _checkRouteDeviation(position.latitude, position.longitude);
         _updateRemainingRoute(position.latitude, position.longitude);
         _updateTurnByTurn(position.latitude, position.longitude);
-        mapboxMap?.flyTo(
           _isProgrammaticMove = true;
         mapboxMap?.flyTo(
           mapbox.CameraOptions(
@@ -1072,6 +1071,7 @@ void _animateMarkerTo(double targetLat, double targetLng, double bearing) {
           );
         }
         _fitRouteBounds(destLat, destLng);
+      }
     } catch (e) {
       if (mounted) ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('Error ruta: $e'), backgroundColor: Colors.red),
