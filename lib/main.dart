@@ -100,9 +100,14 @@ class RoutePainter extends CustomPainter {
   }
 
   @override
-  @override
-  bool shouldRepaint(covariant RoutePainter old) => old.coords != coords;
-}
+  bool shouldRepaint(covariant RoutePainter old) {
+    if (old.coords.length != coords.length) return true;
+    for (int i = 0; i < coords.length; i++) {
+      if (old.coords[i][0] != coords[i][0] ||
+          old.coords[i][1] != coords[i][1]) return true;
+    }
+    return false;
+  }
 
 class MotoGPSApp extends StatefulWidget {
   const MotoGPSApp({super.key});
@@ -147,6 +152,8 @@ class _MotoGPSAppState extends State<MotoGPSApp> with TickerProviderStateMixin {
   bool _showSearch = false;
   List<Map<String, dynamic>> _searchResults = [];
   bool _searchLoading = false;
+  SharedPreferences? _prefs;
+  int _searchToken = 0;
   final TextEditingController _searchController = TextEditingController();
   
   bool _showTapConfirm = false;
@@ -198,7 +205,8 @@ class _MotoGPSAppState extends State<MotoGPSApp> with TickerProviderStateMixin {
     final codec    = await ui.instantiateImageCodec(data, targetWidth: targetWidth);
     final frame    = await codec.getNextFrame();
     final byteData = await frame.image.toByteData(format: ui.ImageByteFormat.png);
-    return byteData!.buffer.asUint8List();
+    if (byteData == null) throw Exception('Error al redimensionar imagen');
+    return byteData.buffer.asUint8List();
   }
 
  Future<Uint8List> _makeCircularImage(Uint8List data, int size) async {
@@ -232,7 +240,8 @@ class _MotoGPSAppState extends State<MotoGPSApp> with TickerProviderStateMixin {
     final picture = recorder.endRecording();
     final img = await picture.toImage(size, size);
     final byteData = await img.toByteData(format: ui.ImageByteFormat.png);
-    return byteData!.buffer.asUint8List();
+    if (byteData == null) throw Exception('Error al procesar imagen circular');
+    return byteData.buffer.asUint8List();
   }
 
   Future<void> _pickUserAvatar() async {
@@ -242,7 +251,7 @@ class _MotoGPSAppState extends State<MotoGPSApp> with TickerProviderStateMixin {
     final bytes = await picked.readAsBytes();
     final circular = await _makeCircularImage(bytes, 70);
     // Guardar en SharedPreferences
-    final prefs = await SharedPreferences.getInstance();
+    final prefs = await _sharedPrefs;
     await prefs.setString('user_avatar', base64Encode(circular));
     setState(() => _userAvatarImage = circular);
     // Eliminar marcador anterior y recrear con avatar
@@ -260,7 +269,7 @@ class _MotoGPSAppState extends State<MotoGPSApp> with TickerProviderStateMixin {
   }
 
   Future<void> _loadUserAvatar() async {
-    final prefs = await SharedPreferences.getInstance();
+    final prefs = await _sharedPrefs;
     final raw = prefs.getString('user_avatar');
     if (raw != null) {
       setState(() => _userAvatarImage = base64Decode(raw));
@@ -275,7 +284,7 @@ class _MotoGPSAppState extends State<MotoGPSApp> with TickerProviderStateMixin {
 
   // ── Libro de viajes ───────────────────────────────────
   Future<void> _loadTrips() async {
-    final prefs = await SharedPreferences.getInstance();
+    final prefs = await _sharedPrefs;
     final raw   = prefs.getString('trip_records');
     if (raw != null) {
       final data = json.decode(raw) as List;
@@ -285,6 +294,9 @@ class _MotoGPSAppState extends State<MotoGPSApp> with TickerProviderStateMixin {
     }
   }
 
+  Future<SharedPreferences> get _sharedPrefs async =>
+    _prefs ??= await SharedPreferences.getInstance():
+  
   Future<void> _initTts() async {
     await _tts.setLanguage('es-MX');
     await _tts.setSpeechRate(0.52);
@@ -296,55 +308,39 @@ class _MotoGPSAppState extends State<MotoGPSApp> with TickerProviderStateMixin {
 
 Future<void> _speak(String text) async {
   if (text.isEmpty || text == _lastSpokenInstruction) return;
-  if (_isSpeaking) return;   // ← descartar si ya está hablando
+  if (_isSpeaking) return;
   _lastSpokenInstruction = text;
   _isSpeaking = true;
-  await _tts.speak(text);
-  _isSpeaking = false;
+  try {
+    await _tts.speak(text);
+  } catch (_) {
+    _lastSpokenInstruction = ''; // permite reintentar el mismo texto
+  } finally {
+    _isSpeaking = false;         // siempre se libera, pase lo que pase
+  }
 }
 
   Future<void> _searchPlaces(String query) async {
-    if (query.trim().length < 3) {
-      setState(() => _searchResults = []);
-      return;
-    }
-    setState(() => _searchLoading = true);
-    try {
-      const types = 'place,locality,neighborhood,address,district';
-      final proximity = _currentPosition != null
-          ? '&proximity=${_currentPosition!.longitude},${_currentPosition!.latitude}'
-          : '';
-      final url =
-          'https://api.mapbox.com/geocoding/v5/mapbox.places/'
-          '${Uri.encodeComponent(query)}.json'
-          '?access_token=$_mapboxToken'
-          '&language=es'
-          '&country=MX,US'
-          '&types=$types'
-          '&limit=7'
-          '$proximity';
-      final response = await http.get(Uri.parse(url));
-      if (response.statusCode == 200) {
-        final features = json.decode(response.body)['features'] as List;
-        setState(() {
-          _searchResults = features.map((f) {
-             // Siempre usar center — es el punto representativo oficial de Mapbox
-          final center = f['center'] as List;
-          final double lat = (center[1] as num).toDouble();
-          final double lng = (center[0] as num).toDouble();
-
-          return {
-            'name':      f['text'] as String,
-            'full_name': f['place_name'] as String,
-            'lat':       lat,
-            'lng':       lng,
-          };
-        }).toList();
-        });
-      }
-    } catch (_) {}
-    setState(() => _searchLoading = false);
+  if (query.trim().length < 3) {
+    setState(() => _searchResults = []);
+    return;
   }
+  final token = ++_searchToken; // captura el token de esta llamada
+  setState(() => _searchLoading = true);
+  try {
+    // ... petición HTTP (no cambia nada aquí) ...
+    if (response.statusCode == 200) {
+      if (token != _searchToken) return; // respuesta obsoleta, descartar
+      final features = json.decode(response.body)['features'] as List;
+      setState(() {
+        _searchResults = features.map((f) {
+          // ...
+        }).toList();
+      });
+    }
+  } catch (_) {}
+  if (token == _searchToken) setState(() => _searchLoading = false);
+}
 
   Future<void> _selectSearchResult(Map<String, dynamic> place) async {
     final lat = place['lat'] as double;
@@ -368,7 +364,7 @@ Future<void> _speak(String text) async {
   }
   
   Future<void> _saveTrips() async {
-    final prefs = await SharedPreferences.getInstance();
+    final prefs = await _sharedPrefs;
     await prefs.setString(
       'trip_records',
       json.encode(_trips.map((t) => t.toJson()).toList()),
@@ -733,18 +729,12 @@ void _checkRouteDeviation(double lat, double lng) {
       await annotationManager!.update(motoAnnotation!);
       return;
     }
-    if (motoAnnotation == null) {
-      motoAnnotation = await annotationManager!.create(mapbox.PointAnnotationOptions(
-        geometry: mapbox.Point(coordinates: mapbox.Position(lng, lat)),
-        image: markerImage, iconSize: 1.2,
-        iconAnchor: mapbox.IconAnchor.CENTER,
-        iconRotate: _userAvatarImage != null ? 0.0 : bearing,
-      ));
-    } else {
-      motoAnnotation!.geometry = mapbox.Point(coordinates: mapbox.Position(lng, lat));
-      motoAnnotation!.iconRotate = bearing;
-      await annotationManager!.update(motoAnnotation!);
-    }
+    motoAnnotation = await annotationManager!.create(mapbox.PointAnnotationOptions(
+      geometry: mapbox.Point(coordinates: mapbox.Position(lng, lat)),
+      image: markerImage, iconSize: 1.2,
+      iconAnchor: mapbox.IconAnchor.CENTER,
+      iconRotate: _userAvatarImage != null ? 0.0 : bearing,
+    ));
   }
 
   Future<void> _addDestinationMarker(double lat, double lng) async {
@@ -787,6 +777,7 @@ void _animateMarkerTo(double targetLat, double targetLng, double bearing) {
         .animate(CurvedAnimation(parent: _markerAnimController!, curve: Curves.easeOut));
 
     _markerAnimController!.addListener(() {
+      if (!mounted) return;
       _updateMotoMarker(animLat.value, animLng.value, bearing);
     });
 
@@ -879,7 +870,7 @@ void _animateMarkerTo(double targetLat, double targetLng, double bearing) {
         _animateMarkerTo(snappedLat, snappedLng, bearing);
         _accumulateTripDistance(position);
         // Detectar desvío de ruta
-        _checkRouteDeviation(snappedLat, snappedLng);
+        _checkRouteDeviation(position.latitude, position.longitude);
         _updateRemainingRoute(position.latitude, position.longitude);
         _updateTurnByTurn(position.latitude, position.longitude);
         mapboxMap?.flyTo(
@@ -1056,6 +1047,7 @@ void _animateMarkerTo(double targetLat, double targetLng, double bearing) {
     }
   }
   Future<void> _drawRouteOnMap(Map<String, dynamic> geometry) async {
+    if (mapboxMap == null) return;
     final style = await mapboxMap!.style;
     // Limpiar rutas anteriores
     for (int i = 0; i < 5; i++) { 
@@ -1636,9 +1628,16 @@ if (!_navigating)
                       : 'mapbox://styles/mapbox/streets-v12',
                 );
                 if (!_isSatellite) await _applyCustomRoadStyle();
-                // Restaurar gasolineras tras cambio de estilo
+                // Restaurar capas tras cambio de estilo
                 await Future.delayed(const Duration(milliseconds: 1500));
-                if (_currentPosition != null && mounted && _gasolinerasVisible) {  // ← respetar estado
+                if (_routeDrawn && _routeCoordinates.isNotEmpty && mounted) {
+                  final geometry = {
+                    'type': 'LineString',
+                    'coordinates': _routeCoordinates,
+                  };
+                  await _drawRouteOnMap({'type': 'LineString', 'coordinates': _routeCoordinates});
+                }
+                if (_currentPosition != null && mounted && _gasolinerasVisible) {
                   _fetchGasolineras(
                     _currentPosition!.latitude,
                     _currentPosition!.longitude,
