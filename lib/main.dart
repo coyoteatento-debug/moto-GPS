@@ -152,7 +152,6 @@ class _MotoGPSAppState extends State<MotoGPSApp> with TickerProviderStateMixin {
   bool _showSearch = false;
   List<Map<String, dynamic>> _searchResults = [];
   bool _searchLoading = false;
-  SharedPreferences? _prefs;
   int _searchToken = 0;
   final TextEditingController _searchController = TextEditingController();
   
@@ -295,7 +294,7 @@ class _MotoGPSAppState extends State<MotoGPSApp> with TickerProviderStateMixin {
   }
 
   Future<SharedPreferences> get _sharedPrefs async =>
-    _prefs ??= await SharedPreferences.getInstance():
+    _prefs ??= await SharedPreferences.getInstance();
   
   Future<void> _initTts() async {
     await _tts.setLanguage('es-MX');
@@ -305,6 +304,7 @@ class _MotoGPSAppState extends State<MotoGPSApp> with TickerProviderStateMixin {
   }
 
   bool _isSpeaking = false;
+  SharedPreferences? _prefs;
 
 Future<void> _speak(String text) async {
   if (text.isEmpty || text == _lastSpokenInstruction) return;
@@ -325,16 +325,37 @@ Future<void> _speak(String text) async {
     setState(() => _searchResults = []);
     return;
   }
-  final token = ++_searchToken; // captura el token de esta llamada
+  final token = ++_searchToken;
   setState(() => _searchLoading = true);
   try {
-    // ... petición HTTP (no cambia nada aquí) ...
+    const types = 'place,locality,neighborhood,address,district';
+    final proximity = _currentPosition != null
+        ? '&proximity=${_currentPosition!.longitude},${_currentPosition!.latitude}'
+        : '';
+    final url =
+        'https://api.mapbox.com/geocoding/v5/mapbox.places/'
+        '${Uri.encodeComponent(query)}.json'
+        '?access_token=$_mapboxToken'
+        '&language=es'
+        '&country=MX,US'
+        '&types=$types'
+        '&limit=7'
+        '$proximity';
+    final response = await http.get(Uri.parse(url));
+    if (token != _searchToken) return; // ← AQUÍ, después del await, fuera del .map()
     if (response.statusCode == 200) {
-      if (token != _searchToken) return; // respuesta obsoleta, descartar
       final features = json.decode(response.body)['features'] as List;
       setState(() {
         _searchResults = features.map((f) {
-          // ...
+          final center = f['center'] as List;
+          final double lat = (center[1] as num).toDouble();
+          final double lng = (center[0] as num).toDouble();
+          return <String, dynamic>{
+            'name':      f['text'] as String,
+            'full_name': f['place_name'] as String,
+            'lat':       lat,
+            'lng':       lng,
+          };
         }).toList();
       });
     }
