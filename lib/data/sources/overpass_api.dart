@@ -1,0 +1,42 @@
+import 'dart:convert';
+import 'package:http/http.dart' as http;
+
+class OverpassApi {
+  const OverpassApi();
+
+  Future<String?> fetchGasolineras(double lat, double lng) async {
+    const double radius = 8000;
+    final query =
+        '[out:json][timeout:40];\n'
+        '(\n'
+        '  node[amenity=fuel](around:$radius,$lat,$lng);\n'
+        '  way[amenity=fuel](around:$radius,$lat,$lng);\n'
+        ');\n'
+        'out center;\n';
+    final response = await http.post(
+      Uri.parse('https://overpass-api.de/api/interpreter'),
+      body: query,
+    );
+    if (response.statusCode != 200) return null;
+    final elements = json.decode(response.body)['elements'] as List;
+    final features = elements.map((e) {
+      final pLat = e['type'] == 'node'
+          ? (e['lat'] as num).toDouble()
+          : (e['center']?['lat'] as num?)?.toDouble() ?? 0.0;
+      final pLng = e['type'] == 'node'
+          ? (e['lon'] as num).toDouble()
+          : (e['center']?['lon'] as num?)?.toDouble() ?? 0.0;
+      if (pLat == 0.0 && pLng == 0.0) return null;
+      return {
+        'type': 'Feature',
+        'geometry': {'type': 'Point', 'coordinates': [pLng, pLat]},
+        'properties': {
+          'name': (e['tags']?['name'] as String?)
+              ?? (e['tags']?['brand'] as String?)
+              ?? 'Gasolinera',
+        },
+      };
+    }).whereType<Map>().toList();
+    return json.encode({'type': 'FeatureCollection', 'features': features});
+  }
+}
