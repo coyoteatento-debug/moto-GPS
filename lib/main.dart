@@ -15,6 +15,7 @@ import 'presentation/widgets/search_modal.dart';
 import 'presentation/widgets/trip_book.dart';
 import 'data/sources/prefs_source.dart';
 import 'core/utils/image_utils.dart';
+import 'core/utils/geo_utils.dart';
 import 'dart:convert';
 
 const String _mapboxToken = String.fromEnvironment('MAPBOX_TOKEN', defaultValue: '');
@@ -165,6 +166,7 @@ class _MotoGPSAppState extends State<MotoGPSApp> with TickerProviderStateMixin {
   bool _isSpeaking = false;
   final PrefsSource _prefsSource = PrefsSource();
   final ImageUtils _imageUtils = const ImageUtils();
+  final GeoUtils _geo = const GeoUtils();
 
 Future<void> _speak(String text) async {
   if (text.isEmpty || text == _lastSpokenInstruction) return;
@@ -232,7 +234,7 @@ Future<void> _speak(String text) async {
 
   void _accumulateTripDistance(Position position) {
     if (_lastTripPosition != null) {
-      _tripAccumulatedDistance += _distanceBetween(
+      _tripAccumulatedDistance += _geo.distanceBetween(
         _lastTripPosition!.latitude,
         _lastTripPosition!.longitude,
         position.latitude,
@@ -269,12 +271,6 @@ Future<void> _speak(String text) async {
 } else if (status.isPermanentlyDenied) {
       openAppSettings();
     }
-  }
-
-  double _calculateDynamicZoom(double speed) {
-    if (speed < 20) return 16.0;
-    if (speed < 80) return 14.0;
-    return 12.0;
   }
 
   // ── Mapa ──────────────────────────────────────────────
@@ -365,56 +361,9 @@ Future<void> _speak(String text) async {
   }
 }
 
-  // ── Utilidades ruta ───────────────────────────────────
-  double _distanceBetween(double lat1, double lng1, double lat2, double lng2) {
-    const R = 6371000.0;
-    final dLat = (lat2 - lat1) * pi / 180;
-    final dLng = (lng2 - lng1) * pi / 180;
-    final a = sin(dLat / 2) * sin(dLat / 2) +
-        cos(lat1 * pi / 180) * cos(lat2 * pi / 180) * sin(dLng / 2) * sin(dLng / 2);
-    return R * 2 * atan2(sqrt(a), sqrt(1 - a));
-  }
-
-  int _findClosestPointIndex(double lat, double lng) {
-    double minDist = double.infinity;
-    int idx = 0;
-    for (int i = 0; i < _routeCoordinates.length; i++) {
-      final d = _distanceBetween(lat, lng, _routeCoordinates[i][1], _routeCoordinates[i][0]);
-      if (d < minDist) { minDist = d; idx = i; }
-    }
-    return idx;
-  }
-
-  List<double> _snapToRoute(double lat, double lng) {
-    if (_routeCoordinates.length < 2) return [lng, lat];
-    double minDist = double.infinity;
-    List<double> snapped = [lng, lat];
-    for (int i = 0; i < _routeCoordinates.length - 1; i++) {
-      final a = _routeCoordinates[i];
-      final b = _routeCoordinates[i + 1];
-      final abX = b[0]-a[0]; final abY = b[1]-a[1];
-      final apX = lng-a[0];  final apY = lat-a[1];
-      final ab2 = abX*abX + abY*abY;
-      if (ab2 == 0) continue;
-      final t = ((apX*abX + apY*abY) / ab2).clamp(0.0, 1.0);
-      final pLng = a[0]+t*abX; final pLat = a[1]+t*abY;
-      final d = _distanceBetween(lat, lng, pLat, pLng);
-      if (d < minDist) { minDist = d; snapped = [pLng, pLat]; }
-    }
-    return snapped;
-  }
-
-  double _bearingBetween(double lat1, double lng1, double lat2, double lng2) {
-    final dLng = (lng2-lng1)*pi/180;
-    final y = sin(dLng)*cos(lat2*pi/180);
-    final x = cos(lat1*pi/180)*sin(lat2*pi/180) -
-               sin(lat1*pi/180)*cos(lat2*pi/180)*cos(dLng);
-    return (atan2(y, x)*180/pi + 360) % 360;
-  }
-
   Future<void> _updateRemainingRoute(double lat, double lng) async {
     if (!_navigating || _routeCoordinates.isEmpty || mapboxMap == null) return;
-    final idx = _findClosestPointIndex(lat, lng);
+    final idx = _geo.findClosestPointIndex(lat, lng, _routeCoordinates);
     if (idx >= _routeCoordinates.length - 2) {
       if (!_navigating) return;   // ← ya está siendo cancelado
       await _finishAndSaveTrip();
@@ -445,24 +394,13 @@ void _checkRouteDeviation(double lat, double lng) {
       final loc     = _routeSteps[_currentStepIndex]['location'] as List;
       final stepLat = (loc[1] as num).toDouble();
       final stepLng = (loc[0] as num).toDouble();
-      if (_distanceBetween(lat, lng, stepLat, stepLng) < 120) return;
+      if (_geo.distanceBetween(lat, lng, stepLat, stepLng) < 120) return;
     }
 
     if (_lastRecalcTime != null &&
         DateTime.now().difference(_lastRecalcTime!).inSeconds < 20) return;
 
-    double minDist = double.infinity;
-    for (int i = 0; i < _routeCoordinates.length - 1; i++) {
-      final a = _routeCoordinates[i];
-      final b = _routeCoordinates[i + 1];
-      final abX = b[0] - a[0]; final abY = b[1] - a[1];
-      final apX = lng  - a[0]; final apY = lat  - a[1];
-      final ab2 = abX * abX + abY * abY;
-      if (ab2 == 0) continue;
-      final t = ((apX * abX + apY * abY) / ab2).clamp(0.0, 1.0);
-      final d = _distanceBetween(lat, lng, a[1] + t * abY, a[0] + t * abX);
-      if (d < minDist) minDist = d;
-    }
+    final minDist = _geo.distanceToRoute(lat, lng, _routeCoordinates);
 
     if (minDist > 55) {
       _deviationCount++;
@@ -495,7 +433,7 @@ void _checkRouteDeviation(double lat, double lng) {
     final loc     = step['location'] as List;
     final stepLng = (loc[0] as num).toDouble();
     final stepLat = (loc[1] as num).toDouble();
-    final distToManeuver = _distanceBetween(lat, lng, stepLat, stepLng);
+    final distToManeuver = _geo.distanceBetween(lat, lng, stepLat, stepLng);
 
     setState(() => _distanceToNextManeuver = distToManeuver);
 
@@ -609,7 +547,7 @@ void _animateMarkerTo(double targetLat, double targetLng, double bearing) {
       _updateMotoMarker(targetLat, targetLng, bearing);
       return;
     }
-    final dist = _distanceBetween(
+    final dist = _geo.distanceBetween(
       _lastAnimatedLat!, _lastAnimatedLng!, targetLat, targetLng);
     if (dist < 0.5) return;
     if (!mounted) return;
@@ -709,13 +647,13 @@ void _animateMarkerTo(double targetLat, double targetLng, double bearing) {
 }
 
       if (_navigating && _routeCoordinates.isNotEmpty) {
-        final snapped    = _snapToRoute(position.latitude, position.longitude);
+        final snapped    = _geo.snapToRoute(position.latitude, position.longitude, _routeCoordinates);
         final snappedLng = snapped[0];
         final snappedLat = snapped[1];
-        final idx        = _findClosestPointIndex(position.latitude, position.longitude);
+        final idx        = _geo.findClosestPointIndex(position.latitude, position.longitude, _routeCoordinates);
         double bearing   = position.heading;
         if (idx < _routeCoordinates.length - 1) {
-          bearing = _bearingBetween(
+          bearing = _geo.bearingBetween(
               _routeCoordinates[idx][1], _routeCoordinates[idx][0],
               _routeCoordinates[idx+1][1], _routeCoordinates[idx+1][0]);
         }
@@ -741,7 +679,7 @@ void _animateMarkerTo(double targetLat, double targetLng, double bearing) {
             mapbox.CameraOptions(
               center: mapbox.Point(coordinates: mapbox.Position(
                   position.longitude, position.latitude)),
-              zoom: _calculateDynamicZoom(_currentSpeed),
+              zoom: _geo.calculateDynamicZoom(_currentSpeed),
               bearing: position.heading,
               pitch: 0.0,
             ),
@@ -907,7 +845,7 @@ void _animateMarkerTo(double targetLat, double targetLng, double bearing) {
     if (_currentPosition == null) return;
 
     // Calcular distancia para ajustar zoom dinámicamente
-    final dist = _distanceBetween(
+    final dist = _geo.distanceBetween(
       _currentPosition!.latitude, _currentPosition!.longitude,
       destLat, destLng,
     );
@@ -1081,7 +1019,7 @@ void _animateMarkerTo(double targetLat, double targetLng, double bearing) {
                       center: mapbox.Point(coordinates: mapbox.Position(
                         _currentPosition!.longitude, _currentPosition!.latitude,
                       )),
-                      zoom: _calculateDynamicZoom(_currentSpeed),
+                      zoom: _geo.calculateDynamicZoom(_currentSpeed),
                       bearing: _currentPosition!.heading,
                       pitch: 0.0,
                     ),
@@ -1588,7 +1526,7 @@ if (!_navigating)
                           _currentPosition!.longitude,
                           _currentPosition!.latitude,
                         )),
-                        zoom: _calculateDynamicZoom(_currentSpeed),
+                        zoom: _geo.calculateDynamicZoom(_currentSpeed),
                         bearing: _currentPosition!.heading,
                         pitch: 0.0,
                       ),
