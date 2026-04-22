@@ -1,5 +1,6 @@
 import 'dart:convert';
 import 'package:mapbox_maps_flutter/mapbox_maps_flutter.dart' as mapbox;
+import 'dart:typed_data';
 
 class MapService {
   const MapService();
@@ -179,5 +180,72 @@ class MapService {
         );
       }
     } catch (_) {}
+  }
+  // ── Crear o actualizar marcador de moto ───────────────
+  Future<mapbox.PointAnnotation?> updateMotoMarker({
+    required mapbox.PointAnnotationManager manager,
+    required mapbox.PointAnnotation? current,
+    required double lat,
+    required double lng,
+    required double bearing,
+    required Uint8List markerImage,
+    required bool isAvatar,
+  }) async {
+    try {
+      if (current != null) {
+        current.geometry = mapbox.Point(
+            coordinates: mapbox.Position(lng, lat));
+        current.iconRotate = isAvatar ? 0.0 : bearing;
+        await manager.update(current);
+        return current;
+      } else {
+        return await manager.create(
+          mapbox.PointAnnotationOptions(
+            geometry: mapbox.Point(
+                coordinates: mapbox.Position(lng, lat)),
+            image: markerImage,
+            iconSize: 1.2,
+            iconAnchor: mapbox.IconAnchor.CENTER,
+            iconRotate: isAvatar ? 0.0 : bearing,
+          ),
+        );
+      }
+    } catch (_) {
+      return null;
+    }
+  }
+
+  // ── Crear o reemplazar marcador de destino ────────────
+  Future<mapbox.PointAnnotation?> updateDestinationMarker({
+    required mapbox.PointAnnotationManager manager,
+    required mapbox.PointAnnotation? current,
+    required double lat,
+    required double lng,
+    required Uint8List pinImage,
+  }) async {
+    if (current != null) {
+      try { await manager.delete(current); } catch (_) {}
+    }
+    try {
+      return await manager.create(
+        mapbox.PointAnnotationOptions(
+          geometry: mapbox.Point(
+              coordinates: mapbox.Position(lng, lat)),
+          image: pinImage,
+          iconSize: 1.2,
+          iconAnchor: mapbox.IconAnchor.BOTTOM,
+        ),
+      );
+    } catch (_) {
+      return null;
+    }
+  }
+
+  // ── Eliminar marcador ─────────────────────────────────
+  Future<void> deleteAnnotation(
+    mapbox.PointAnnotationManager manager,
+    mapbox.PointAnnotation annotation,
+  ) async {
+    try { await manager.delete(annotation); } catch (_) {}
   }
 }
