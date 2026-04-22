@@ -128,7 +128,8 @@ class _MotoGPSAppState extends State<MotoGPSApp> with TickerProviderStateMixin {
     await _prefsSource.saveAvatar(circular);
     setState(() => _userAvatarImage = circular);
     if (motoAnnotation != null && annotationManager != null) {
-      await annotationManager!.delete(motoAnnotation!);
+      await _mapService.deleteAnnotation(
+          annotationManager!, motoAnnotation!);
       motoAnnotation = null;
     }
     if (_currentPosition != null) {
@@ -416,49 +417,38 @@ void _checkRouteDeviation(double lat, double lng) {
 
   Future<void> _cancelTap() async {
     if (destinationAnnotation != null && annotationManager != null) {
-      await annotationManager!.delete(destinationAnnotation!);
+      await _mapService.deleteAnnotation(
+          annotationManager!, destinationAnnotation!);
       destinationAnnotation = null;
     }
     setState(() { _showTapConfirm = false; _tappedLat = null; _tappedLng = null; });
   }
 
   // ── Marcadores ────────────────────────────────────────
-  Future<void> _updateMotoMarker(double lat, double lng, double bearing) async {
-  final markerImage = _userAvatarImage ?? pinImage;
-  if (annotationManager == null || markerImage == null) return;
-  try {
-    if (motoAnnotation != null) {
-      motoAnnotation!.geometry = mapbox.Point(
-          coordinates: mapbox.Position(lng, lat));
-      motoAnnotation!.iconRotate = _userAvatarImage != null ? 0.0 : bearing;
-      await annotationManager!.update(motoAnnotation!);
-    } else {
-      motoAnnotation = await annotationManager!.create(
-        mapbox.PointAnnotationOptions(
-          geometry: mapbox.Point(coordinates: mapbox.Position(lng, lat)),
-          image: markerImage,
-          iconSize: 1.2,
-          iconAnchor: mapbox.IconAnchor.CENTER,
-          iconRotate: _userAvatarImage != null ? 0.0 : bearing,
-        ),
-      );
-    }
-  } catch (_) {
-    // Si el update falla (anotación inválida), forzar recreación
-    motoAnnotation = null;
+  Future<void> _updateMotoMarker(
+      double lat, double lng, double bearing) async {
+    final markerImage = _userAvatarImage ?? pinImage;
+    if (annotationManager == null || markerImage == null) return;
+    motoAnnotation = await _mapService.updateMotoMarker(
+      manager:     annotationManager!,
+      current:     motoAnnotation,
+      lat:         lat,
+      lng:         lng,
+      bearing:     bearing,
+      markerImage: markerImage,
+      isAvatar:    _userAvatarImage != null,
+    );
   }
-}
 
   Future<void> _addDestinationMarker(double lat, double lng) async {
-    if (annotationManager == null) return;
-    if (destinationAnnotation != null) {
-      await annotationManager!.delete(destinationAnnotation!);
-      destinationAnnotation = null;
-    }
-    destinationAnnotation = await annotationManager!.create(mapbox.PointAnnotationOptions(
-      geometry: mapbox.Point(coordinates: mapbox.Position(lng, lat)),
-      image: pinImage, iconSize: 1.2, iconAnchor: mapbox.IconAnchor.BOTTOM,
-    ));
+    if (annotationManager == null || pinImage == null) return;
+    destinationAnnotation = await _mapService.updateDestinationMarker(
+      manager: annotationManager!,
+      current: destinationAnnotation,
+      lat:     lat,
+      lng:     lng,
+      pinImage: pinImage!,
+    );
   }
 
 void _animateMarkerTo(double targetLat, double targetLng, double bearing) {
@@ -675,7 +665,8 @@ void _animateMarkerTo(double targetLat, double targetLng, double bearing) {
         await _drawRouteOnMap(geometry);
         // Redibujar marcador encima de la ruta
         if (motoAnnotation != null && annotationManager != null) {
-          await annotationManager!.delete(motoAnnotation!);
+          await _mapService.deleteAnnotation(
+              annotationManager!, motoAnnotation!);
           motoAnnotation = null;
         }
         if (_currentPosition != null) {
@@ -735,7 +726,8 @@ void _animateMarkerTo(double targetLat, double targetLng, double bearing) {
     if (_navigating) await _finishAndSaveTrip();
     if (mapboxMap != null) await _mapService.clearRouteLayers(mapboxMap!);
     if (destinationAnnotation != null && annotationManager != null) {
-      await annotationManager!.delete(destinationAnnotation!);
+      await _mapService.deleteAnnotation(
+          annotationManager!, destinationAnnotation!);
       destinationAnnotation = null;
     }
      await _tts.stop();
