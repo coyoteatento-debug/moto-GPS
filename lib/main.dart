@@ -16,6 +16,7 @@ import 'data/sources/prefs_source.dart';
 import 'core/utils/image_utils.dart';
 import 'core/utils/geo_utils.dart';
 import 'core/services/tts_service.dart';
+import 'core/services/map_service.dart';
 import 'dart:convert';
 
 const String _mapboxToken = String.fromEnvironment('MAPBOX_TOKEN', defaultValue: '');
@@ -57,6 +58,7 @@ class _MotoGPSAppState extends State<MotoGPSApp> with TickerProviderStateMixin {
 
   // ── TTS ───────────────────────────────────────────────
   final TtsService _tts = TtsService();
+  final MapService _mapService = const MapService();
   
   // ── Turn-by-turn ──────────────────────────────────────
   List<Map<String, dynamic>> _routeSteps = [];
@@ -285,90 +287,28 @@ Future<void> _speak(String text) async {
 }    
   // ── Estilo de carreteras tipo Riser ───────────────────
   Future<void> _applyCustomRoadStyle() async {
-  if (mapboxMap == null) return;
-  final style = await mapboxMap!.style;
-
-  final Map<String, String> lineColors = {
-    // ── Autopistas → Naranja brillante ──────────────────
-    'road-motorway':                '#FF6500',
-    'road-motorway-case':           '#CC4E00',
-    'road-motorway-link':           '#FF6500',
-    'road-motorway-link-case':      '#CC4E00',
-    'road-motorway-trunk':          '#FF6500',
-    'road-motorway-trunk-case':     '#CC4E00',
-    // ── Tronco (trunk) → Naranja brillante ──────────────
-    'road-trunk':                   '#FF6500',
-    'road-trunk-case':              '#CC4E00',
-    'road-trunk-link':              '#FF6500',
-    'road-trunk-link-case':         '#CC4E00',
-    // ── Primarias / Boulevards → Amarillo vivo ───────────
-    'road-primary':                 '#FFD600',
-    'road-primary-case':            '#C9A800',
-    'road-primary-link':            '#FFD600',
-    // ── Secundarias → Amarillo suave ────────────────────
-    'road-secondary':               '#FFE566',
-    'road-secondary-case':          '#C9B400',
-    'road-secondary-link':          '#FFE566',
-    'road-secondary-tertiary':      '#FFE566',
-    'road-secondary-tertiary-case': '#C9B400',
-    // ── Terciarias → Amarillo pálido ────────────────────
-    'road-tertiary':                '#FFF0A0',
-    'road-tertiary-case':           '#D4C87A',
-    // ── Calles normales → Gris claro ────────────────────
-    'road-street':                  '#D6D6D6',
-    'road-street-case':             '#B0B0B0',
-    'road-street-low':              '#D6D6D6',
-    // ── Servicio → Gris medio ────────────────────────────
-    'road-service':                 '#C4C4C4',
-    'road-service-case':            '#A0A0A0',
-    // ── Peatonal y caminos → Gris muy suave ─────────────
-    'road-pedestrian':              '#E0E0E0',
-    'road-pedestrian-case':         '#C8C8C8',
-    'road-path':                    '#DADADA',
-    'road-path-bg':                 '#C8C8C8',
-  };
-
-  for (final entry in lineColors.entries) {
-    try {
-      await style.setStyleLayerProperty(
-        entry.key, 'line-color', json.encode(entry.value),
-      );
-    } catch (_) {}
+    if (mapboxMap == null) return;
+    await _mapService.applyCustomRoadStyle(mapboxMap!);
   }
-
-  // ── Fondo gris muy claro (contraste limpio con las vías) ─
-  for (final bg in ['land', 'background', 'landcover']) {
-    try {
-      await style.setStyleLayerProperty(
-        bg, 'background-color', json.encode('#EFEFEF'),
-      );
-    } catch (_) {}
-  }
-}
 
   Future<void> _updateRemainingRoute(double lat, double lng) async {
     if (!_navigating || _routeCoordinates.isEmpty || mapboxMap == null) return;
     final idx = _geo.findClosestPointIndex(lat, lng, _routeCoordinates);
     if (idx >= _routeCoordinates.length - 2) {
-      if (!_navigating) return;   // ← ya está siendo cancelado
+      if (!_navigating) return;
       await _finishAndSaveTrip();
       await _cancelRoute();
-      if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
-        content: Text('🏁 ¡Has llegado a tu destino!'),
-        backgroundColor: Colors.green,
-        duration: Duration(seconds: 3),
-      ));
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('🏁 ¡Has llegado a tu destino!'),
+          backgroundColor: Colors.green,
+          duration: Duration(seconds: 3),
+        ),
+      );
       return;
     }
     final remaining = _routeCoordinates.sublist(idx);
-    if (remaining.length < 2) return;
-    try {
-      final style = await mapboxMap!.style;
-      await style.setStyleSourceProperty('route-source-0', 'data', json.encode({
-        'type': 'Feature',
-        'geometry': {'type': 'LineString', 'coordinates': remaining},
-      }));
-    } catch (_) {}
+    await _mapService.updateRemainingRoute(mapboxMap!, remaining);
   }
 
 // REEMPLAZA todo el método:
@@ -690,26 +630,7 @@ void _animateMarkerTo(double targetLat, double targetLng, double bearing) {
 
   Future<void> _updateGasolineraLayer(String geoJson) async {
     if (mapboxMap == null) return;
-    try {
-      final style = await mapboxMap!.style;
-      try { await style.removeStyleLayer('gasolineras-layer');  } catch (_) {}
-      try { await style.removeStyleSource('gasolineras-source'); } catch (_) {}
-      await style.addSource(mapbox.GeoJsonSource(
-        id: 'gasolineras-source', data: geoJson,
-      ));
-      await style.addLayer(mapbox.SymbolLayer(
-        id:               'gasolineras-layer',
-        sourceId:         'gasolineras-source',
-        iconImage:        'fuel',
-        iconSize:         1.2,
-        iconAllowOverlap: false,
-        textField:        '{name}',
-        textSize:         10.0,
-        textOffset:       [0.0, 1.8],
-        textAllowOverlap: false,
-        textOptional:     true,
-      ));
-    } catch (_) {}
+    await _mapService.updateGasolineraLayer(mapboxMap!, geoJson);
   }
 
   // ── Ruta ──────────────────────────────────────────────
@@ -792,38 +713,7 @@ void _animateMarkerTo(double targetLat, double targetLng, double bearing) {
     
   Future<void> _drawRouteOnMap(Map<String, dynamic> geometry) async {
     if (mapboxMap == null) return;
-    final style = await mapboxMap!.style;
-    // Limpiar rutas anteriores
-    for (int i = 0; i < 5; i++) { 
-      try { await style.removeStyleLayer('route-layer-$i'); } catch (_) {}
-      try { await style.removeStyleSource('route-source-$i'); } catch (_) {}
-    }
-    try { await style.removeStyleLayer('route-layer');  } catch (_) {}
-    try { await style.removeStyleSource('route-source'); } catch (_) {}
-
-    // Dibujar rutas alternas primero (gris)
-    for (int i = 1; i < _alternateRoutes.length; i++) {
-      await style.addSource(mapbox.GeoJsonSource(
-        id: 'route-source-$i',
-        data: json.encode({'type': 'Feature', 'geometry': _alternateRoutes[i]['geometry']}),
-      ));
-      await style.addLayer(mapbox.LineLayer(
-        id: 'route-layer-$i', sourceId: 'route-source-$i',
-        lineColor: 0xFF90A4AE, lineWidth: 5.0,
-        lineCap: mapbox.LineCap.ROUND, lineJoin: mapbox.LineJoin.ROUND,
-      ));
-    }
-
-    // Dibujar ruta principal (azul) encima
-    await style.addSource(mapbox.GeoJsonSource(
-      id: 'route-source-0',
-      data: json.encode({'type': 'Feature', 'geometry': geometry}),
-    ));
-    await style.addLayer(mapbox.LineLayer(
-      id: 'route-layer-0', sourceId: 'route-source-0',
-      lineColor: 0xFF1976D2, lineWidth: 6.0,
-      lineCap: mapbox.LineCap.ROUND, lineJoin: mapbox.LineJoin.ROUND,
-    ));
+    await _mapService.drawRouteOnMap(mapboxMap!, geometry, _alternateRoutes);
   }
 
   void _fitRouteBounds(double destLat, double destLng) {
@@ -858,19 +748,7 @@ void _animateMarkerTo(double targetLat, double targetLng, double bearing) {
   // ── FIX 1: _tts.stop() movido FUERA de setState ───────
   Future<void> _cancelRoute() async {
     if (_navigating) await _finishAndSaveTrip();
-    if (mapboxMap != null) {
-      try {
-        final style = await mapboxMap!.style;
-        // Borrar todas las capas indexadas (principal + alternas)
-        for (int i = 0; i < 5; i++) {
-          try { await style.removeStyleLayer('route-layer-$i');  } catch (_) {}
-          try { await style.removeStyleSource('route-source-$i'); } catch (_) {}
-        }
-        // Por compatibilidad, borrar también los IDs legacy sin índice
-        try { await style.removeStyleLayer('route-layer');  } catch (_) {}
-        try { await style.removeStyleSource('route-source'); } catch (_) {}
-      } catch (_) {}
-    }
+    if (mapboxMap != null) await _mapService.clearRouteLayers(mapboxMap!);
     if (destinationAnnotation != null && annotationManager != null) {
       await annotationManager!.delete(destinationAnnotation!);
       destinationAnnotation = null;
@@ -1248,18 +1126,10 @@ if (!_navigating)
                               });
                               // Resaltar ruta seleccionada
                               try {
-                                final style = await mapboxMap!.style;
-                                for (int j = 0; j < _alternateRoutes.length; j++) {
-                                  await style.setStyleLayerProperty(
-                                    'route-layer-$j', 'line-color',
-                                    json.encode(j == i ? '#1976D2' : '#90A4AE'),
-                                  );
-                                  await style.setStyleLayerProperty(
-                                    'route-layer-$j', 'line-width',
-                                    json.encode(j == i ? 6.0 : 4.0),
-                                  );
-                                }
-                              } catch (_) {}
+                                if (mapboxMap != null) {
+                                await _mapService.highlightRoute(
+                                  mapboxMap!, i, _alternateRoutes.length);
+                              }
                             },
                             child: Container(
                               padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
