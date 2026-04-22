@@ -3,9 +3,7 @@ import 'package:flutter/services.dart';
 import 'package:mapbox_maps_flutter/mapbox_maps_flutter.dart' as mapbox;
 import 'package:geolocator/geolocator.dart';
 import 'package:permission_handler/permission_handler.dart';
-import 'package:shared_preferences/shared_preferences.dart';
 import 'dart:typed_data';
-import 'dart:convert';
 import 'dart:math';
 import 'data/models/trip_record.dart';
 import 'presentation/widgets/route_painter.dart';
@@ -17,6 +15,7 @@ import 'data/sources/mapbox_api.dart';
 import 'data/sources/overpass_api.dart';
 import 'presentation/widgets/search_modal.dart';
 import 'presentation/widgets/trip_book.dart';
+import 'data/sources/prefs_source.dart';
 
 const String _mapboxToken = String.fromEnvironment('MAPBOX_TOKEN', defaultValue: '');
 
@@ -168,9 +167,7 @@ class _MotoGPSAppState extends State<MotoGPSApp> with TickerProviderStateMixin {
     if (picked == null) return;
     final bytes = await picked.readAsBytes();
     final circular = await _makeCircularImage(bytes, 70);
-    // Guardar en SharedPreferences
-    final prefs = await _sharedPrefs;
-    await prefs.setString('user_avatar', base64Encode(circular));
+    await _prefsSource.saveAvatar(circular);
     setState(() => _userAvatarImage = circular);
     // Eliminar marcador anterior y recrear con avatar
     if (motoAnnotation != null && annotationManager != null) {
@@ -187,11 +184,8 @@ class _MotoGPSAppState extends State<MotoGPSApp> with TickerProviderStateMixin {
   }
 
   Future<void> _loadUserAvatar() async {
-    final prefs = await _sharedPrefs;
-    final raw = prefs.getString('user_avatar');
-    if (raw != null) {
-      setState(() => _userAvatarImage = base64Decode(raw));
-    }
+    final bytes = await _prefsSource.loadAvatar();
+    if (bytes != null && mounted) setState(() => _userAvatarImage = bytes);
   }
   
   Future<void> _loadImages() async {
@@ -202,18 +196,9 @@ class _MotoGPSAppState extends State<MotoGPSApp> with TickerProviderStateMixin {
 
   // ── Libro de viajes ───────────────────────────────────
   Future<void> _loadTrips() async {
-    final prefs = await _sharedPrefs;
-    final raw   = prefs.getString('trip_records');
-    if (raw != null) {
-      final data = json.decode(raw) as List;
-      setState(() {
-        _trips = data.map((e) => TripRecord.fromJson(e)).toList();
-      });
-    }
+    final trips = await _prefsSource.loadTrips();
+    if (mounted) setState(() => _trips = trips);
   }
-
-  Future<SharedPreferences> get _sharedPrefs async =>
-    _prefs ??= await SharedPreferences.getInstance();
   
   Future<void> _initTts() async {
     await _tts.setLanguage('es-MX');
@@ -223,7 +208,7 @@ class _MotoGPSAppState extends State<MotoGPSApp> with TickerProviderStateMixin {
   }
 
   bool _isSpeaking = false;
-  SharedPreferences? _prefs;
+  final PrefsSource _prefsSource = PrefsSource();
 
 Future<void> _speak(String text) async {
   if (text.isEmpty || text == _lastSpokenInstruction) return;
@@ -280,11 +265,7 @@ Future<void> _speak(String text) async {
   }
   
   Future<void> _saveTrips() async {
-    final prefs = await _sharedPrefs;
-    await prefs.setString(
-      'trip_records',
-      json.encode(_trips.map((t) => t.toJson()).toList()),
-    );
+    await _prefsSource.saveTrips(_trips);
   }
 
   void _startTripTracking() {
