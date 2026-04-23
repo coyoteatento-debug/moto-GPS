@@ -389,11 +389,11 @@ void _animateMarkerTo(double targetLat, double targetLng, double bearing) {
     final animLng = Tween<double>(begin: fromLng, end: targetLng)
         .animate(CurvedAnimation(parent: _markerAnimController!, curve: Curves.easeOut));
 
-    _markerAnimController!.addListener(() async {
+    _markerAnimController!.addListener(() {
       if (!mounted) return;
       final double lat = animLat.value;
       final double lng = animLng.value;
-      await _updateMotoMarker(lat, lng, bearing);
+      _updateMotoMarker(lat, lng, bearing);
     });
 
     _markerAnimController!.addStatusListener((status) {
