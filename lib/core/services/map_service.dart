@@ -128,17 +128,28 @@ class MapService {
   ) async {
     try {
       final style = await map.style;
-      try { await style.removeStyleLayer('gasolineras-layer');  } catch (_) {}
-      try { await style.removeStyleSource('gasolineras-source'); } catch (_) {}
+      try { await style.removeStyleLayer('gasolineras-layer');    } catch (_) {}
+      try { await style.removeStyleLayer('gasolineras-label');    } catch (_) {}
+      try { await style.removeStyleSource('gasolineras-source');  } catch (_) {}
+
       await style.addSource(mapbox.GeoJsonSource(
         id: 'gasolineras-source', data: geoJson,
       ));
+
+      // Círculo naranja — sin dependencia de íconos del estilo
+      await style.addLayer(mapbox.CircleLayer(
+        id:              'gasolineras-layer',
+        sourceId:        'gasolineras-source',
+        circleRadius:    8.0,
+        circleColor:     0xFFFF6D00,
+        circleStrokeWidth: 2.0,
+        circleStrokeColor: 0xFFFFFFFF,
+      ));
+
+      // Etiqueta de nombre
       await style.addLayer(mapbox.SymbolLayer(
-        id:               'gasolineras-layer',
+        id:               'gasolineras-label',
         sourceId:         'gasolineras-source',
-        iconImage:        'fuel',
-        iconSize:         1.2,
-        iconAllowOverlap: false,
         textField:        '{name}',
         textSize:         10.0,
         textOffset:       [0.0, 1.8],
@@ -211,7 +222,7 @@ class MapService {
         );
       }
     } catch (_) {
-      return null;
+      return current;
     }
   }
 
