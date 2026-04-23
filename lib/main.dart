@@ -319,12 +319,10 @@ void _checkRouteDeviation(double lat, double lng) {
     try {
       placeName = await _mapboxApi.reverseGeocode(_s.tappedLat!, _s.tappedLng!);
     } catch (_) {}
-    setState(() {
-      _n.update((s) => s.copyWith(
-        selectedPlace:  {'name': placeName, 'lat': s.tappedLat, 'lng': s.tappedLng},
-        showTapConfirm: false,
-      ));
-    });
+    _n.update((s) => s.copyWith(
+      selectedPlace:  {'name': placeName, 'lat': s.tappedLat, 'lng': s.tappedLng},
+      showTapConfirm: false,
+    ));
     await _getRoute(_s.tappedLat!, _s.tappedLng!);
   }
 
@@ -697,7 +695,6 @@ void _animateMarkerTo(double targetLat, double targetLng, double bearing) {
         ));
         if (_s.showSearch) _searchController.clear();
       },
-      }),
       onSearchClose: () {
         _n.clearSearch();
         _searchController.clear();
@@ -731,7 +728,7 @@ void _animateMarkerTo(double targetLat, double targetLng, double bearing) {
       onGasolinerasToggle:     () async {
         if (s.currentPosition == null || s.gasolinerasLoading) return;
         if (s.gasolinerasVisible) {
-          _n.setGasolinerasVisible(false)
+          _n.setGasolinerasVisible(false);
           try {
             final style = await mapboxMap!.style;
             try { await style.removeStyleLayer('gasolineras-layer');  } catch (_) {}
@@ -773,16 +770,15 @@ void _animateMarkerTo(double targetLat, double targetLng, double bearing) {
       onStartNavigation:       _startNavigation,
       onRouteSelect:           (i) async {
         final r = s.alternateRoutes[i];
-        setState(() {
-          _n.selectRoute(i, _s.alternateRoutes);
-        });
+        _n.selectRoute(i, _s.alternateRoutes);
         if (mapboxMap != null) {
           await _mapService.highlightRoute(
               mapboxMap!, i, _s.alternateRoutes.length);
         }
       },
     );
-
+  }
+    
   // ── BUILD ─────────────────────────────────────────────
   @override
   Widget build(BuildContext context) {
