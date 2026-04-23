@@ -418,7 +418,7 @@ void _animateMarkerTo(double targetLat, double targetLng, double bearing) {
     _lastAnimatedLat    = position.latitude;
     _lastAnimatedLng    = position.longitude;
     _n.setInitialLocationSet(true);
-    await _updateMotoMarker(
+    _updateMotoMarker(
         position.latitude, position.longitude, position.heading);
     if (mapboxMap != null) {
       mapboxMap?.flyTo(
