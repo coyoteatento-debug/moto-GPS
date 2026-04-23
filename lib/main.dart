@@ -17,6 +17,7 @@ import 'core/services/tts_service.dart';
 import 'core/services/map_service.dart';
 import 'core/services/gps_service.dart';
 import 'core/services/trip_service.dart';
+import 'core/services/navigation_service.dart';
 import 'dart:convert';
 import 'package:geolocator/geolocator.dart';
 
@@ -61,6 +62,8 @@ class _MotoGPSAppState extends State<MotoGPSApp> with TickerProviderStateMixin {
   final MapService _mapService = const MapService();
   final GpsService _gpsService = const GpsService();
   late final TripService _tripService = TripService(_prefsSource);
+  late final NavigationService _navService =
+      NavigationService(MapboxApi(_mapboxToken), const GeoUtils());
   
   // ── Turn-by-turn ──────────────────────────────────────
   List<Map<String, dynamic>> _routeSteps = [];
@@ -251,8 +254,8 @@ Future<void> _speak(String text) async {
 
   Future<void> _updateRemainingRoute(double lat, double lng) async {
     if (!_navigating || _routeCoordinates.isEmpty || mapboxMap == null) return;
-    final idx = _geo.findClosestPointIndex(lat, lng, _routeCoordinates);
-    if (idx >= _routeCoordinates.length - 2) {
+
+    if (_navService.hasArrived(lat, lng, _routeCoordinates)) {
       if (!_navigating) return;
       final record = await _tripService.finishAndSave(
         destination:   _selectedPlace?['name'] ?? 'Destino',
@@ -272,11 +275,12 @@ Future<void> _speak(String text) async {
       );
       return;
     }
+
+    final idx       = _geo.findClosestPointIndex(lat, lng, _routeCoordinates);
     final remaining = _routeCoordinates.sublist(idx);
     await _mapService.updateRemainingRoute(mapboxMap!, remaining);
   }
 
-// REEMPLAZA todo el método:
 void _checkRouteDeviation(double lat, double lng) {
     if (!_navigating || _routeCoordinates.isEmpty || _isRecalculating) return;
 
@@ -290,9 +294,7 @@ void _checkRouteDeviation(double lat, double lng) {
     if (_lastRecalcTime != null &&
         DateTime.now().difference(_lastRecalcTime!).inSeconds < 20) return;
 
-    final minDist = _geo.distanceToRoute(lat, lng, _routeCoordinates);
-
-    if (minDist > 55) {
+    if (_navService.isDeviated(lat, lng, _routeCoordinates)) {
       _deviationCount++;
       if (_deviationCount >= 3) {
         _deviationCount = 0;
@@ -317,38 +319,15 @@ void _checkRouteDeviation(double lat, double lng) {
   }
   
   void _updateTurnByTurn(double lat, double lng) {
-    if (_routeSteps.isEmpty || _currentStepIndex >= _routeSteps.length) return;
-
-    final step    = _routeSteps[_currentStepIndex];
-    final loc     = step['location'] as List;
-    final stepLng = (loc[0] as num).toDouble();
-    final stepLat = (loc[1] as num).toDouble();
-    final distToManeuver = _geo.distanceBetween(lat, lng, stepLat, stepLng);
-
-    setState(() => _distanceToNextManeuver = distToManeuver);
-
-    // Aviso anticipado a ~150m antes de la maniobra
-    if (distToManeuver < 150 && distToManeuver >= 120) {
-      final instr = _routeSteps[_currentStepIndex]['instruction'] as String;
-      _speak('En 150 metros, $instr');
-    }
-
-    // Aviso cercano a ~50m
-    if (distToManeuver < 50 && distToManeuver >= 30) {
-      final instr = _routeSteps[_currentStepIndex]['instruction'] as String;
-      _speak(instr);
-    }
-
-    // Avanza al siguiente paso al pasar la maniobra
-    if (distToManeuver < 15 && _currentStepIndex < _routeSteps.length - 1) {
-      _currentStepIndex++;
-      final next = _routeSteps[_currentStepIndex];
-      setState(() {
-        _currentInstruction     = next['instruction'] as String;
-        _distanceToNextManeuver = next['distance'] as double;
-      });
-      // NO hablar aquí — el aviso vendrá cuando se acerque
-    }
+    final update = _navService.updateTurn(
+        lat, lng, _routeSteps, _currentStepIndex);
+    if (update == null) return;
+    setState(() {
+      _distanceToNextManeuver = update.distanceToManeuver;
+      _currentStepIndex       = update.nextStepIndex;
+      _currentInstruction     = update.nextInstruction;
+    });
+    if (update.announceText != null) _speak(update.announceText!);
   }
 
   // ── Tap mapa ──────────────────────────────────────────
@@ -578,77 +557,53 @@ void _animateMarkerTo(double targetLat, double targetLng, double bearing) {
   Future<void> _getRoute(double destLat, double destLng) async {
     if (_currentPosition == null) return;
     try {
-      final data = await _mapboxApi.getRoute(
+      final routes = await _navService.getRoutes(
         originLat: _currentPosition!.latitude,
         originLng: _currentPosition!.longitude,
-        destLat: destLat,
-        destLng: destLng,
+        destLat:   destLat,
+        destLng:   destLng,
       );
-      if (data != null) {
-        final routes = data['routes'] as List;
-        if (routes.isEmpty) return;
-        // Guardar todas las rutas disponibles
-        setState(() {
-          _alternateRoutes = routes.map<Map<String, dynamic>>((r) => {
-            'distance': '${((r['distance'] as num).toDouble()/1000).toStringAsFixed(1)} km',
-            'duration': '${((r['duration'] as num).toDouble()/60).round()} min',
-            'geometry': r['geometry'],
-            'coords': (r['geometry']['coordinates'] as List)
-                .map((c) => [(c[0] as num).toDouble(), (c[1] as num).toDouble()])
-                .toList(),
-            'steps': (r['legs'][0]['steps'] as List)
-                .map((s) => {
-                      'instruction': (s['maneuver']['instruction'] as String?) ?? '',
-                      'distance':    (s['distance'] as num).toDouble(),
-                      'location':    s['maneuver']['location'] as List,
-                    })
-                .toList(),
-          }).toList();
-          _selectedRouteIndex = 0;
-        });
-        final route = routes[0];
-        final geometry = route['geometry'];
-        final coords   = (geometry['coordinates'] as List)
-            .map((c) => [(c[0] as num).toDouble(), (c[1] as num).toDouble()]).toList();
-        setState(() {
-          _routeDistance = '${((route['distance'] as num).toDouble()/1000).toStringAsFixed(1)} km';
-          _routeDuration = '${((route['duration'] as num).toDouble()/60).round()} min';
-          _routeDrawn       = true;
-          _routeCoordinates = coords;
-          _routeSteps = (route['legs'][0]['steps'] as List)
-              .map((s) => {
-                    'instruction': (s['maneuver']['instruction'] as String?) ?? '',
-                    'distance':    (s['distance'] as num).toDouble(),
-                    'location':    s['maneuver']['location'] as List,
-                  })
-              .toList();
-          _currentStepIndex   = 0;
-          _currentInstruction = _routeSteps.isNotEmpty
-              ? _routeSteps[0]['instruction'] as String : '';
-          _distanceToNextManeuver = _routeSteps.isNotEmpty
-              ? _routeSteps[0]['distance'] as double : 0.0;
-        });
-        await _drawRouteOnMap(geometry);
-        // Redibujar marcador encima de la ruta
-        if (motoAnnotation != null && annotationManager != null) {
-          await _mapService.deleteAnnotation(
-              annotationManager!, motoAnnotation!);
-          motoAnnotation = null;
-        }
-        if (_currentPosition != null) {
-          _lastAnimatedLat = _currentPosition!.latitude;
-          _lastAnimatedLng = _currentPosition!.longitude;
-          await _updateMotoMarker(
-            _currentPosition!.latitude,
-            _currentPosition!.longitude,
-            _currentPosition!.heading,
-          );
-        }
-        _fitRouteBounds(destLat, destLng);
+      if (routes.isEmpty) return;
+      setState(() {
+        _alternateRoutes = routes.map((r) => <String, dynamic>{
+          'distance': r.distance,
+          'duration': r.duration,
+          'geometry': r.geometry,
+          'coords':   r.coords,
+          'steps':    r.steps,
+        }).toList();
+        _selectedRouteIndex     = 0;
+        _routeDistance          = routes[0].distance;
+        _routeDuration          = routes[0].duration;
+        _routeDrawn             = true;
+        _routeCoordinates       = routes[0].coords;
+        _routeSteps             = routes[0].steps;
+        _currentStepIndex       = 0;
+        _currentInstruction     = _routeSteps.isNotEmpty
+            ? _routeSteps[0]['instruction'] as String : '';
+        _distanceToNextManeuver = _routeSteps.isNotEmpty
+            ? _routeSteps[0]['distance'] as double : 0.0;
+      });
+      await _drawRouteOnMap(routes[0].geometry);
+      if (motoAnnotation != null && annotationManager != null) {
+        await _mapService.deleteAnnotation(
+            annotationManager!, motoAnnotation!);
+        motoAnnotation = null;
       }
+      if (_currentPosition != null) {
+        _lastAnimatedLat = _currentPosition!.latitude;
+        _lastAnimatedLng = _currentPosition!.longitude;
+        await _updateMotoMarker(
+          _currentPosition!.latitude,
+          _currentPosition!.longitude,
+          _currentPosition!.heading,
+        );
+      }
+      _fitRouteBounds(destLat, destLng);
     } catch (e) {
       if (mounted) ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Error ruta: $e'), backgroundColor: Colors.red),
+        SnackBar(content: Text('Error ruta: $e'),
+            backgroundColor: Colors.red),
       );
     }
   }
@@ -660,28 +615,18 @@ void _animateMarkerTo(double targetLat, double targetLng, double bearing) {
 
   void _fitRouteBounds(double destLat, double destLng) {
     if (_currentPosition == null) return;
-
-    // Calcular distancia para ajustar zoom dinámicamente
     final dist = _geo.distanceBetween(
       _currentPosition!.latitude, _currentPosition!.longitude,
       destLat, destLng,
     );
-
-    // Zoom según distancia total de la ruta
-    double zoom;
-    if (dist < 5000)        zoom = 13.0;
-    else if (dist < 20000)  zoom = 11.0;
-    else if (dist < 80000)  zoom = 9.0;
-    else if (dist < 200000) zoom = 7.5;
-    else                    zoom = 6.0;
-
     mapboxMap?.flyTo(
       mapbox.CameraOptions(
         center: mapbox.Point(coordinates: mapbox.Position(
           (_currentPosition!.longitude + destLng) / 2,
           (_currentPosition!.latitude  + destLat) / 2,
         )),
-        zoom: zoom, bearing: 0.0, pitch: 0.0,
+        zoom: _navService.fitZoom(dist),
+        bearing: 0.0, pitch: 0.0,
       ),
       mapbox.MapAnimationOptions(duration: 1800, startDelay: 0),
     );
