@@ -17,8 +17,11 @@ class OverpassApi {
       Uri.parse('https://overpass-api.de/api/interpreter'),
       body: query,
     );
-    if (response.statusCode != 200) return null;
+    if (response.statusCode != 200) {
+      throw Exception('Overpass HTTP ${response.statusCode}');
+    }
     final elements = json.decode(response.body)['elements'] as List;
+    if (elements.isEmpty) return null;
     final features = elements.map((e) {
       final pLat = e['type'] == 'node'
           ? (e['lat'] as num).toDouble()
@@ -37,6 +40,7 @@ class OverpassApi {
         },
       };
     }).whereType<Map>().toList();
+    if (features.isEmpty) return null;
     return json.encode({'type': 'FeatureCollection', 'features': features});
   }
 }
