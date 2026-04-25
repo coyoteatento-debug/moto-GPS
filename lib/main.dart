@@ -695,6 +695,7 @@ void _animateMarkerTo(double targetLat, double targetLng, double bearing) {
       currentInstruction:      s.currentInstruction,
       distanceToNextManeuver:  s.distanceToNextManeuver,
       currentSpeed:            s.currentSpeed,
+      gpsTickCount:            _gpsTickCount,
       tappedLat:               s.tappedLat,
       tappedLng:               s.tappedLng,
       selectedPlace:           s.selectedPlace,
