@@ -52,7 +52,6 @@ class _MotoGPSAppState extends ConsumerState<MotoGPSApp> with TickerProviderStat
   AnimationController? _markerAnimController;
   double? _lastAnimatedLat;
   double? _lastAnimatedLng;
-  bool _isUpdatingMarker = false;
 
   final TtsService _tts = TtsService();
   final MapService _mapService = const MapService();
@@ -339,23 +338,17 @@ void _checkRouteDeviation(double lat, double lng) {
   // ── Marcadores ────────────────────────────────────────
   Future<void> _updateMotoMarker(
       double lat, double lng, double bearing) async {
-    if (_isUpdatingMarker) return;
-    _isUpdatingMarker = true;
-    try {
-      final markerImage = _s.userAvatarImage ?? _s.pinImage;
-      if (annotationManager == null || markerImage == null) return;
-      motoAnnotation = await _mapService.updateMotoMarker(
-        manager:     annotationManager!,
-        current:     motoAnnotation,
-        lat:         lat,
-        lng:         lng,
-        bearing:     bearing,
-        markerImage: markerImage,
-        isAvatar:    _s.userAvatarImage != null,
-      );
-    } finally {
-      _isUpdatingMarker = false;
-    }
+    final markerImage = _s.userAvatarImage ?? _s.pinImage;
+    if (annotationManager == null || markerImage == null) return;
+    motoAnnotation = await _mapService.updateMotoMarker(
+      manager:     annotationManager!,
+      current:     motoAnnotation,
+      lat:         lat,
+      lng:         lng,
+      bearing:     bearing,
+      markerImage: markerImage,
+      isAvatar:    _s.userAvatarImage != null,
+    );
   }
 
   Future<void> _addDestinationMarker(double lat, double lng) async {
@@ -381,8 +374,8 @@ void _animateMarkerTo(double targetLat, double targetLng, double bearing) {
         _lastAnimatedLat!, _lastAnimatedLng!, targetLat, targetLng);
     if (dist < 0.5) return;
 
-    // Actualizar coordenadas ANTES de animar para que el próximo
-    // tick compare desde la posición correcta
+    final fromLat = _lastAnimatedLat!;
+    final fromLng = _lastAnimatedLng!;
     _lastAnimatedLat = targetLat;
     _lastAnimatedLng = targetLng;
 
@@ -395,9 +388,6 @@ void _animateMarkerTo(double targetLat, double targetLng, double bearing) {
       vsync: this,
       duration: const Duration(milliseconds: 600),
     );
-
-    final fromLat = _lastAnimatedLat!;
-    final fromLng = _lastAnimatedLng!;
 
     final animLat = Tween<double>(begin: fromLat, end: targetLat)
         .animate(CurvedAnimation(
@@ -496,8 +486,7 @@ void _animateMarkerTo(double targetLat, double targetLng, double bearing) {
           mapbox.MapAnimationOptions(duration: 900, startDelay: 0),
         );
       } else {
-       _updateMotoMarker(
-          position.latitude, position.longitude, position.heading);
+        _updateMotoMarker(position.latitude, position.longitude, position.heading);
         _animateMarkerTo(position.latitude, position.longitude, position.heading);
         if (!_s.routeDrawn && !_s.showTapConfirm && !_s.userIsExploring) {
           _n.setIsProgrammaticMove(true);
