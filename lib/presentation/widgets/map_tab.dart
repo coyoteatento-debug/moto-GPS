@@ -21,7 +21,6 @@ class MapTab extends StatelessWidget {
   final String currentInstruction;
   final double distanceToNextManeuver;
   final double currentSpeed;
-  final int gpsTickCount;
   final double? tappedLat;
   final double? tappedLng;
   final Map<String, dynamic>? selectedPlace;
@@ -72,7 +71,6 @@ class MapTab extends StatelessWidget {
     required this.currentInstruction,
     required this.distanceToNextManeuver,
     required this.currentSpeed,
-    required this.gpsTickCount,
     required this.tappedLat,
     required this.tappedLng,
     required this.selectedPlace,
@@ -562,32 +560,7 @@ class MapTab extends StatelessWidget {
             ),
           ),
         ),
-
-// ── Panel debug GPS (temporal) ─────────────────────
-      Positioned(
-        top: 120, left: 16,
-        child: Container(
-          padding: const EdgeInsets.all(8),
-          decoration: BoxDecoration(
-            color: Colors.black87,
-            borderRadius: BorderRadius.circular(8),
-          ),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Text(
-                'LAT: ${currentSpeed > 0 ? "MOVING" : "STOPPED"}',
-                style: const TextStyle(color: Colors.green, fontSize: 11),
-              ),
-              Text(
-                'SPD: ${currentSpeed.toStringAsFixed(1)} km/h',
-                style: const TextStyle(color: Colors.white, fontSize: 11),
-              ),
-            ],
-          ),
-        ),
-      ),
+      
       
       // ── Velocímetro modo libre ─────────────────────────
       if (!navigating && !routeDrawn && !showTapConfirm)
