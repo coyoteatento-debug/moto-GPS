@@ -52,6 +52,7 @@ class _MotoGPSAppState extends ConsumerState<MotoGPSApp> with TickerProviderStat
   AnimationController? _markerAnimController;
   double? _lastAnimatedLat;
   double? _lastAnimatedLng;
+  int _gpsTickCount = 0;
 
   final TtsService _tts = TtsService();
   final MapService _mapService = const MapService();
@@ -438,6 +439,7 @@ void _animateMarkerTo(double targetLat, double targetLng, double bearing) {
   void _startLocationTracking() {
      _locationSubscription = _gpsService.startTracking((Position position) {
       if (!mounted) return;
+       setState(() => _gpsTickCount++);
       final speed = (position.speed < 0 ? 0 : position.speed) * 3.6;
       _n.update((s) => s.copyWith(
         currentSpeed:    speed,
