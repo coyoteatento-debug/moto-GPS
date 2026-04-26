@@ -19,7 +19,13 @@ class OverpassApi {
       '?data=${Uri.encodeComponent(query)}',
     );
 
-    final response = await http.get(uri);
+    final response = await http.get(
+      uri,
+      headers: {
+        'User-Agent': 'MotoGPS/1.0',
+        'Accept': 'application/json',
+      },
+    );
 
     if (response.statusCode != 200) {
       throw Exception('Overpass HTTP ${response.statusCode}');
