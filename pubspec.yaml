@@ -28,4 +28,3 @@ flutter:
   uses-material-design: true
   assets:
     - assets/moto_pin.png
-    - assets/moto.png
