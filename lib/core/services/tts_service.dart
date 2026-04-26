@@ -13,22 +13,27 @@ class TtsService {
   }
 
   Future<void> speak(String text) async {
-    if (text.isEmpty || text == _lastSpoken) return;
-    if (_isSpeaking) return;
-    _lastSpoken = text;
-    _isSpeaking = true;
-    try {
-      await _tts.speak(text);
-    } catch (_) {
-      _lastSpoken = '';
-    } finally {
-      _isSpeaking = false;
-    }
+  if (text.isEmpty) return;
+  if (_isSpeaking) return;
+  if (text == _lastSpoken) return;
+  _isSpeaking = true;
+  _lastSpoken = text;
+  try {
+    await _tts.speak(text);
+  } catch (_) {
+    // Si falla, limpiamos para permitir reintento
+    _lastSpoken = '';
+  } finally {
+    _isSpeaking = false;
+    // Pequeño delay para evitar solapamiento entre instrucciones
+    await Future.delayed(const Duration(milliseconds: 300));
   }
+}
 
   Future<void> stop() async {
-    await _tts.stop();
+    _isSpeaking = false;       // ← agrega esta línea
     _lastSpoken = '';
+    await _tts.stop();
   }
 
   void resetLastSpoken() => _lastSpoken = '';
