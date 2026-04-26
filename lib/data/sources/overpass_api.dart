@@ -7,22 +7,27 @@ class OverpassApi {
   Future<String?> fetchGasolineras(double lat, double lng) async {
     const double radius = 8000;
     final query =
-        '[out:json][timeout:40];\n'
-        '(\n'
-        '  node[amenity=fuel](around:$radius,$lat,$lng);\n'
-        '  way[amenity=fuel](around:$radius,$lat,$lng);\n'
-        ');\n'
-        'out center;\n';
-    final response = await http.post(
-      Uri.parse('https://overpass-api.de/api/interpreter'),
-      headers: {'Content-Type': 'application/x-www-form-urlencoded'},
-      body: 'data=${Uri.encodeComponent(query)}',
+        '[out:json][timeout:40];'
+        '('
+        'node[amenity=fuel](around:$radius,$lat,$lng);'
+        'way[amenity=fuel](around:$radius,$lat,$lng);'
+        ');'
+        'out center;';
+
+    final uri = Uri.parse(
+      'https://overpass-api.de/api/interpreter'
+      '?data=${Uri.encodeComponent(query)}',
     );
+
+    final response = await http.get(uri);
+
     if (response.statusCode != 200) {
       throw Exception('Overpass HTTP ${response.statusCode}');
     }
+
     final elements = json.decode(response.body)['elements'] as List;
     if (elements.isEmpty) return null;
+
     final features = elements.map((e) {
       final pLat = e['type'] == 'node'
           ? (e['lat'] as num).toDouble()
@@ -41,7 +46,7 @@ class OverpassApi {
         },
       };
     }).whereType<Map>().toList();
+
     if (features.isEmpty) return null;
     return json.encode({'type': 'FeatureCollection', 'features': features});
   }
-}
