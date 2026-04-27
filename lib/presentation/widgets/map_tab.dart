@@ -171,7 +171,8 @@ class MapTab extends StatelessWidget {
       // ── Botón recentrar ────────────────────────────────
       if (userIsExploring && !navigating)
         Positioned(
-          bottom: 110, right: 16,
+          bottom: (routeDrawn && alternateRoutes.length > 1) ? 310 : 110,
+          right: 16,
           child: GestureDetector(
             onTap: onRecenter,
             child: Container(
@@ -389,7 +390,8 @@ class MapTab extends StatelessWidget {
       // ── Panel ruta ─────────────────────────────────────
       if (routeDrawn && !navigating && !showTapConfirm)
         Positioned(
-          bottom: 30, left: 16, right: 16,
+          bottom: (alternateRoutes.length > 1) ? 185 + 70 : 30,
+          left: 16, right: 16,
           child: Container(
             padding: const EdgeInsets.all(16),
             decoration: BoxDecoration(
@@ -517,7 +519,7 @@ class MapTab extends StatelessWidget {
         ),
 
       // ── Banner turn-by-turn ────────────────────────────
-      if (navigating && currentInstruction.isNotEmpty)
+      if (navigating && currentInstruction.isNotEmpty && !isRecalculating)
         Positioned(
           top: 0, left: 0, right: 0,
           child: Container(
