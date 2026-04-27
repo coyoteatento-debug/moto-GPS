@@ -27,12 +27,12 @@ class NavigationService {
   
   // ── Obtener rutas ─────────────────────────────────────
   Future<List<RouteData>> getRoutes({
-    _bg.updateInstruction('🔄 Calculando ruta...');
     required double originLat,
     required double originLng,
     required double destLat,
     required double destLng,
   }) async {
+    _bg.updateInstruction('Calculando ruta...');
     final data = await _api.getRoute(
       originLat: originLat,
       originLng: originLng,
@@ -116,6 +116,7 @@ class NavigationService {
     }
 
     // Actualizar notificación con la instrucción actual
+    final instruction = step['instruction'] as String;
     if (instruction.isNotEmpty) {
       _bg.updateInstruction(instruction);
     }
