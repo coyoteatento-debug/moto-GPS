@@ -198,7 +198,7 @@ Future<void> _speak(String text) async {
     }
     return permission == LocationPermission.always ||
            permission == LocationPermission.whileInUse;
-  }}
+  }
 
   // ── Mapa ──────────────────────────────────────────────
   Future<void> _onMapCreated(mapbox.MapboxMap map) async {
@@ -818,21 +818,22 @@ void _animateMarkerTo(double targetLat, double targetLng, double bearing) {
     );
   }
 
-@override
-void didChangeAppLifecycleState(AppLifecycleState state) {
-  super.didChangeAppLifecycleState(state);
-  switch (state) {
-    case AppLifecycleState.paused:
-    case AppLifecycleState.inactive:
-      _gpsService.onAppBackground();
-      break;
-    case AppLifecycleState.resumed:
-      _gpsService.onAppForeground();
-      break;
-    default:
-      break;
+// ── Ciclo de vida ─────────────────────────────────────
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    super.didChangeAppLifecycleState(state);
+    switch (state) {
+      case AppLifecycleState.paused:
+      case AppLifecycleState.inactive:
+        _gpsService.onAppBackground();
+        break;
+      case AppLifecycleState.resumed:
+        _gpsService.onAppForeground();
+        break;
+      default:
+        break;
+    }
   }
-}
 
   // ── BUILD ─────────────────────────────────────────────
   @override
