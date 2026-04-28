@@ -36,6 +36,8 @@ class MapState {
   final Map<String, dynamic>? selectedPlace;
   final Uint8List? userAvatarImage;
   final Uint8List? pinImage;
+  final bool isNightMode;
+  final bool nightModeManual;
 
   const MapState({
     this.currentSpeed           = 0.0,
@@ -69,6 +71,8 @@ class MapState {
     this.selectedPlace,
     this.userAvatarImage,
     this.pinImage,
+    this.isNightMode      = false,
+    this.nightModeManual  = false,
   });
 
   MapState copyWith({
@@ -103,6 +107,8 @@ class MapState {
     Map<String, dynamic>?      selectedPlace,
     Uint8List?                 userAvatarImage,
     Uint8List?                 pinImage,
+    bool?                      isNightMode,
+    bool?                      nightModeManual,
     // flags para limpiar nullables
     bool clearCurrentPosition  = false,
     bool clearSelectedPlace    = false,
@@ -141,6 +147,8 @@ class MapState {
       selectedPlace:          clearSelectedPlace     ? null : selectedPlace    ?? this.selectedPlace,
       userAvatarImage:        userAvatarImage        ?? this.userAvatarImage,
       pinImage:               pinImage               ?? this.pinImage,
+      isNightMode:            isNightMode            ?? this.isNightMode,
+      nightModeManual:        nightModeManual        ?? this.nightModeManual,
     );
   }
 }
@@ -173,6 +181,11 @@ class MapNotifier extends Notifier<MapState> {
   void setTrips(List<TripRecord> t)       => state = state.copyWith(trips: t);
   void setUserAvatar(Uint8List? img)      => state = state.copyWith(userAvatarImage: img);
   void setPinImage(Uint8List img)         => state = state.copyWith(pinImage: img);
+  void setNightMode(bool v, {bool manual = false}) => state = state.copyWith(
+    isNightMode: v,
+    nightModeManual: manual ? true : state.nightModeManual,
+  );
+  void resetNightModeManual() => state = state.copyWith(nightModeManual: false);
 
   void setTappedLocation(double lat, double lng) => state = state.copyWith(
     showTapConfirm: true, tappedLat: lat, tappedLng: lng,
