@@ -19,6 +19,7 @@ import 'core/services/map_service.dart';
 import 'core/services/gps_service.dart';
 import 'core/services/background_service.dart';
 import 'core/services/smooth_location_service.dart';
+import 'package:wakelock_plus/wakelock_plus.dart';
 import 'core/services/trip_service.dart';
 import 'core/services/navigation_service.dart';
 import 'dart:convert';
@@ -89,12 +90,12 @@ class _MotoGPSAppState extends ConsumerState<MotoGPSApp>
   }
 
   @override
-  @override
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
     _locationSubscription?.cancel();
     _smoothSub?.cancel();
     _smoother.stop();
+    WakelockPlus.disable();
     _markerAnimController?.dispose();
     _searchController.dispose();
     super.dispose();
@@ -680,12 +681,14 @@ void _animateMarkerTo(double targetLat, double targetLng, double bearing) {
     }
      await _tts.stop();
      await _bgService.stop();
-    _n.clearRoute();
+     await WakelockPlus.disable();
+     _n.clearRoute();
   }
   
   Future<void> _startNavigation() async {
     _n.setNavigating(true);
     await _bgService.start();
+    await WakelockPlus.enable();
     _bgService.updateInstruction(
       _s.currentInstruction.isNotEmpty
           ? _s.currentInstruction
