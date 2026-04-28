@@ -478,12 +478,14 @@ void _animateMarkerTo(double targetLat, double targetLng, double bearing) {
         userIsExploring: speed > 2 && !s.navigating && !s.routeDrawn
             ? false : s.userIsExploring,
       ));
-      _smoother.updatePosition(
-        lat:     position.latitude,
-        lng:     position.longitude,
-        heading: position.heading,
-        speedMs: position.speed < 0 ? 0 : position.speed,
-      );
+      if (!_s.navigating) {
+        _smoother.updatePosition(
+          lat:     position.latitude,
+          lng:     position.longitude,
+          heading: position.heading,
+          speedMs: position.speed < 0 ? 0 : position.speed,
+        );
+      }
       if (!_s.initialLocationSet && mapboxMap != null) {
   _n.setInitialLocationSet(true);
   _n.setIsProgrammaticMove(true);
@@ -515,6 +517,12 @@ void _animateMarkerTo(double targetLat, double targetLng, double bearing) {
         _checkRouteDeviation(position.latitude, position.longitude);
         _updateRemainingRoute(position.latitude, position.longitude);
         _updateTurnByTurn(position.latitude, position.longitude);
+        _smoother.updatePosition(
+          lat:     snappedLat,
+          lng:     snappedLng,
+          heading: bearing,
+          speedMs: position.speed < 0 ? 0 : position.speed,
+        );
           _n.setIsProgrammaticMove(true);
         mapboxMap?.flyTo(
           mapbox.CameraOptions(
