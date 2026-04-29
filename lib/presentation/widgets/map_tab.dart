@@ -57,7 +57,7 @@ class MapTab extends StatelessWidget {
   final VoidCallback onStartNavigation;
   final ValueChanged<int> onRouteSelect;
 
-  const MapTab({
+  MapTab({
     super.key,
     required this.navigating,
     required this.showSearch,
