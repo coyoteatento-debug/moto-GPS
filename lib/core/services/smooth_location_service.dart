@@ -100,12 +100,18 @@ class SmoothLocationService {
 
   // ── Ticker a 60fps ───────────────────────────────────
 
+  DateTime _lastTick = DateTime.fromMillisecondsSinceEpoch(0);
+
   void _onTick(Duration elapsed) {
     if (!_isRunning) return;
     if (_fromLat == null || _toLat == null) return;
     if (_controller == null || !(_controller!.hasListener)) return;
 
-    final now      = DateTime.now();
+    // Limitar a 30fps internamente para reducir carga de CPU
+    final now = DateTime.now();
+    if (now.difference(_lastTick).inMilliseconds < 33) return;
+    _lastTick = now;
+
     final progress = _currentProgress(now);
 
     final lat     = _lerp(_fromLat!, _toLat!, progress);
