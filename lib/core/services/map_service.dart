@@ -3,7 +3,7 @@ import 'package:mapbox_maps_flutter/mapbox_maps_flutter.dart' as mapbox;
 import 'dart:typed_data';
 
 class MapService {
-  const MapService();
+  MapService();
 
   // ── Estilo de carreteras tipo Riser ───────────────────
   Future<void> applyCustomRoadStyle(mapbox.MapboxMap map) async {
