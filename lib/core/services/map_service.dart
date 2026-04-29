@@ -193,6 +193,8 @@ class MapService {
     } catch (_) {}
   }
   // ── Crear o actualizar marcador de moto ───────────────
+  bool _isCreatingMotoMarker = false;
+
   Future<mapbox.PointAnnotation?> updateMotoMarker({
     required mapbox.PointAnnotationManager manager,
     required mapbox.PointAnnotation? current,
@@ -204,24 +206,34 @@ class MapService {
   }) async {
     try {
       if (current != null) {
-        current.geometry = mapbox.Point(
+        // Actualizar posición del marcador existente
+        current.geometry  = mapbox.Point(
             coordinates: mapbox.Position(lng, lat));
         current.iconRotate = isAvatar ? 0.0 : bearing;
         await manager.update(current);
         return current;
       } else {
-        return await manager.create(
-          mapbox.PointAnnotationOptions(
-            geometry: mapbox.Point(
-                coordinates: mapbox.Position(lng, lat)),
-            image: markerImage,
-            iconSize: 1.2,
-            iconAnchor: mapbox.IconAnchor.CENTER,
-            iconRotate: isAvatar ? 0.0 : bearing,
-          ),
-        );
+        // Evitar crear múltiples marcadores simultáneamente
+        if (_isCreatingMotoMarker) return null;
+        _isCreatingMotoMarker = true;
+        try {
+          final annotation = await manager.create(
+            mapbox.PointAnnotationOptions(
+              geometry: mapbox.Point(
+                  coordinates: mapbox.Position(lng, lat)),
+              image:       markerImage,
+              iconSize:    1.2,
+              iconAnchor:  mapbox.IconAnchor.CENTER,
+              iconRotate:  isAvatar ? 0.0 : bearing,
+            ),
+          );
+          return annotation;
+        } finally {
+          _isCreatingMotoMarker = false;
+        }
       }
     } catch (_) {
+      _isCreatingMotoMarker = false;
       return current;
     }
   }
