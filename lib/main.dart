@@ -25,6 +25,7 @@ import 'package:wakelock_plus/wakelock_plus.dart';
 import 'core/services/trip_service.dart';
 import 'core/services/navigation_service.dart';
 import 'dart:convert';
+import 'dart:ui' as ui;
 import 'package:geolocator/geolocator.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'presentation/state/map_notifier.dart';
@@ -80,6 +81,8 @@ class _MotoGPSAppState extends ConsumerState<MotoGPSApp>
 
   int _deviationCount = 0;
   DateTime? _lastRecalcTime;
+  final List<mapbox.PointAnnotation> _waypointAnnotations = [];
+  Timer? _waypointArrivalTimer;
 
   @override
   void initState() {
@@ -103,6 +106,7 @@ class _MotoGPSAppState extends ConsumerState<MotoGPSApp>
     _smoothSub?.cancel();
     _smoother.stop();
     _nightModeTimer?.cancel();
+    _waypointArrivalTimer?.cancel();
     WakelockPlus.disable();
     _searchController.dispose();
     super.dispose();
@@ -456,6 +460,20 @@ void _checkRouteDeviation(double lat, double lng) {
     if (_s.navigating) return;
     final lat = context.point.coordinates.lat.toDouble();
     final lng = context.point.coordinates.lng.toDouble();
+
+    // Modo selección de paradas
+    if (_s.isSelectingWaypoints) {
+      final index = _s.waypoints.length + 1;
+      _n.addWaypoint({
+        'lat':     lat,
+        'lng':     lng,
+        'index':   index,
+        'reached': false,
+      });
+      _addWaypointAnnotation(lat, lng, index);
+      return;
+    }
+
     _n.setTappedLocation(lat, lng);
     _addDestinationMarker(lat, lng);
     mapboxMap?.flyTo(
@@ -505,6 +523,62 @@ void _checkRouteDeviation(double lat, double lng) {
     );
   }
 
+Future<Uint8List> _createWaypointImage(int number) async {
+    const size = 80.0;
+    final recorder = ui.PictureRecorder();
+    final canvas = ui.Canvas(recorder);
+    final fillPaint = ui.Paint()..color = const ui.Color(0xFFFF6F00);
+    canvas.drawCircle(const ui.Offset(40, 40), 36, fillPaint);
+    final borderPaint = ui.Paint()
+      ..color = const ui.Color(0xFFFFFFFF)
+      ..style = ui.PaintingStyle.stroke
+      ..strokeWidth = 4;
+    canvas.drawCircle(const ui.Offset(40, 40), 36, borderPaint);
+    final picture = recorder.endRecording();
+    final image = await picture.toImage(size.toInt(), size.toInt());
+    final bytes = await image.toByteData(format: ui.ImageByteFormat.png);
+    final base = bytes!.buffer.asUint8List();
+
+    // Superponer el número usando TextPainter
+    final recorder2 = ui.PictureRecorder();
+    final canvas2 = ui.Canvas(recorder2);
+    canvas2.drawImage(
+      await decodeImageFromList(base),
+      ui.Offset.zero,
+      ui.Paint(),
+    );
+    final picture2 = recorder2.endRecording();
+    final image2 = await picture2.toImage(size.toInt(), size.toInt());
+    final bytes2 = await image2.toByteData(format: ui.ImageByteFormat.png);
+    return bytes2!.buffer.asUint8List();
+  }
+
+  Future<void> _addWaypointAnnotation(
+      double lat, double lng, int index) async {
+    if (annotationManager == null) return;
+    final img = await _createWaypointImage(index);
+    final annotation = await annotationManager!.create(
+      mapbox.PointAnnotationOptions(
+        geometry: mapbox.Point(
+            coordinates: mapbox.Position(lng, lat)),
+        image: img,
+        iconSize: 0.8,
+        iconAnchor: mapbox.IconAnchor.CENTER,
+      ),
+    );
+    _waypointAnnotations.add(annotation);
+  }
+
+  Future<void> _clearWaypointAnnotations() async {
+    if (annotationManager == null) return;
+    for (final a in _waypointAnnotations) {
+      try { await annotationManager!.delete(a); } catch (_) {}
+    }
+    _waypointAnnotations.clear();
+  }
+
+  Future<void> _addDestinationMarker(double lat, double lng) async {
+  
   Future<void> _addDestinationMarker(double lat, double lng) async {
     if (annotationManager == null || _s.pinImage == null) return;
     destinationAnnotation = await _mapService.updateDestinationMarker(
@@ -619,6 +693,7 @@ void _checkRouteDeviation(double lat, double lng) {
         _checkRouteDeviation(position.latitude, position.longitude);
         _updateRemainingRoute(position.latitude, position.longitude);
         _updateTurnByTurn(position.latitude, position.longitude);
+        _checkWaypointArrival(position.latitude, position.longitude);
         _smoother.updatePosition(
           lat:     snappedLat,
           lng:     snappedLng,
@@ -651,6 +726,30 @@ void _checkRouteDeviation(double lat, double lng) {
     });
   }
 
+void _checkWaypointArrival(double lat, double lng) {
+    if (_s.waypoints.isEmpty) return;
+    if (_s.showWaypointArrival) return;
+    final idx = _s.currentWaypointIndex;
+    if (idx >= _s.waypoints.length) return;
+    final wp  = _s.waypoints[idx];
+    final dist = _geo.distanceBetween(
+        lat, lng,
+        (wp['lat'] as num).toDouble(),
+        (wp['lng'] as num).toDouble());
+    if (dist <= 40) {
+      final num = wp['index'] as int;
+      _n.setWaypointArrival('📍 ¡Has llegado a la parada $num!');
+      _n.advanceWaypoint();
+      _waypointArrivalTimer?.cancel();
+      _waypointArrivalTimer = Timer(
+        const Duration(seconds: 4),
+        () { if (mounted) _n.dismissWaypointArrival(); },
+      );
+    }
+  }
+
+  // ── Gasolineras ───────────────────────────────────────
+    
   // ── Gasolineras ───────────────────────────────────────
   Future<void> _fetchGasolineras(double lat, double lng) async {
     if (mapboxMap == null) return;
@@ -701,6 +800,7 @@ void _checkRouteDeviation(double lat, double lng) {
         originLng: _s.currentPosition!.longitude,
         destLat:   destLat,
         destLng:   destLng,
+        waypoints: _s.waypoints,
       );
       if (routes.isEmpty) return;
       _n.setRouteData(
@@ -761,6 +861,8 @@ void _checkRouteDeviation(double lat, double lng) {
 
   // ── FIX 1: _tts.stop() movido FUERA de setState ───────
   Future<void> _cancelRoute() async {
+    await _clearWaypointAnnotations();
+    _n.clearWaypoints();
     if (_s.navigating) {
       final record = await _tripService.finishAndSave(
         destination:  _s.selectedPlace?['name'] ?? 'Destino',
@@ -838,6 +940,32 @@ void _checkRouteDeviation(double lat, double lng) {
       userIsExploring:         s.userIsExploring,
       isSatellite:             s.isSatellite,
       isNightMode:             s.isNightMode,
+      waypoints:               s.waypoints,
+      isSelectingWaypoints:    s.isSelectingWaypoints,
+      showWaypointArrival:     s.showWaypointArrival,
+      waypointArrivalMessage:  s.waypointArrivalMessage,
+      onWaypointModeToggle: () {
+        _n.setSelectingWaypoints(!_s.isSelectingWaypoints);
+      },
+      onWaypointDone: () async {
+        _n.setSelectingWaypoints(false);
+        if (_s.selectedPlace != null) {
+          await _getRoute(
+            (_s.selectedPlace!['lat'] as num).toDouble(),
+            (_s.selectedPlace!['lng'] as num).toDouble(),
+          );
+        }
+      },
+      onWaypointClear: () async {
+        await _clearWaypointAnnotations();
+        _n.clearWaypoints();
+        if (_s.selectedPlace != null) {
+          await _getRoute(
+            (_s.selectedPlace!['lat'] as num).toDouble(),
+            (_s.selectedPlace!['lng'] as num).toDouble(),
+          );
+        }
+      },
       gasolinerasVisible:      s.gasolinerasVisible,
       gasolinerasLoading:      s.gasolinerasLoading,
       routeDrawn:              s.routeDrawn,
