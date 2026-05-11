@@ -693,8 +693,8 @@ Future<Uint8List> _createWaypointImage(int number) async {
         _updateTurnByTurn(position.latitude, position.longitude);
         _checkWaypointArrival(position.latitude, position.longitude);
         _smoother.updatePosition(
-          lat:     snappedLat,
-          lng:     snappedLng,
+          lat:     position.latitude,
+          lng:     position.longitude,
           heading: bearing,
           speedMs: position.speed < 0 ? 0 : position.speed,
         );
