@@ -39,6 +39,11 @@ class MapState {
   final bool isNightMode;
   final bool nightModeManual;
   final int? speedLimit;
+  final List<Map<String, dynamic>> waypoints;
+  final bool isSelectingWaypoints;
+  final bool showWaypointArrival;
+  final String waypointArrivalMessage;
+  final int currentWaypointIndex;
 
   const MapState({
     this.currentSpeed           = 0.0,
@@ -75,6 +80,11 @@ class MapState {
     this.isNightMode      = false,
     this.nightModeManual  = false,
     this.speedLimit,
+    this.waypoints              = const [],
+    this.isSelectingWaypoints   = false,
+    this.showWaypointArrival    = false,
+    this.waypointArrivalMessage = '',
+    this.currentWaypointIndex   = 0,
   });
 
   MapState copyWith({
@@ -113,6 +123,11 @@ class MapState {
     bool?                      nightModeManual,
     int?                       speedLimit,
     bool                       clearSpeedLimit = false,
+    List<Map<String, dynamic>>? waypoints,
+    bool?                       isSelectingWaypoints,
+    bool?                       showWaypointArrival,
+    String?                     waypointArrivalMessage,
+    int?                        currentWaypointIndex,
     // flags para limpiar nullables
     bool clearCurrentPosition  = false,
     bool clearSelectedPlace    = false,
@@ -154,6 +169,11 @@ class MapState {
       isNightMode:            isNightMode            ?? this.isNightMode,
       nightModeManual:        nightModeManual        ?? this.nightModeManual,
       speedLimit:             clearSpeedLimit ? null : speedLimit ?? this.speedLimit,
+      waypoints:              waypoints              ?? this.waypoints,
+      isSelectingWaypoints:   isSelectingWaypoints   ?? this.isSelectingWaypoints,
+      showWaypointArrival:    showWaypointArrival    ?? this.showWaypointArrival,
+      waypointArrivalMessage: waypointArrivalMessage ?? this.waypointArrivalMessage,
+      currentWaypointIndex:   currentWaypointIndex   ?? this.currentWaypointIndex,
     );
   }
 }
@@ -191,6 +211,41 @@ class MapNotifier extends Notifier<MapState> {
     nightModeManual: manual ? true : state.nightModeManual,
   );
   void resetNightModeManual() => state = state.copyWith(nightModeManual: false);
+
+  // ── Waypoints ─────────────────────────────────────────
+  void setSelectingWaypoints(bool v) =>
+      state = state.copyWith(isSelectingWaypoints: v);
+
+  void addWaypoint(Map<String, dynamic> wp) {
+    final list = List<Map<String, dynamic>>.from(state.waypoints)..add(wp);
+    state = state.copyWith(waypoints: list);
+  }
+
+  void removeWaypoint(int index) {
+    final list = List<Map<String, dynamic>>.from(state.waypoints)
+      ..removeAt(index);
+    state = state.copyWith(waypoints: list);
+  }
+
+  void clearWaypoints() => state = state.copyWith(
+    waypoints: const [],
+    isSelectingWaypoints: false,
+    currentWaypointIndex: 0,
+  );
+
+  void setWaypointArrival(String message) => state = state.copyWith(
+    showWaypointArrival: true,
+    waypointArrivalMessage: message,
+  );
+
+  void dismissWaypointArrival() => state = state.copyWith(
+    showWaypointArrival: false,
+    waypointArrivalMessage: '',
+  );
+
+  void advanceWaypoint() => state = state.copyWith(
+    currentWaypointIndex: state.currentWaypointIndex + 1,
+  );
   void setSpeedLimit(int? limit) => state = state.copyWith(
     speedLimit:     limit,
     clearSpeedLimit: limit == null,
@@ -267,6 +322,11 @@ class MapNotifier extends Notifier<MapState> {
       clearSelectedPlace:     true,
       clearTappedLat:         true,
       clearTappedLng:         true,
+      waypoints:              const [],
+      isSelectingWaypoints:   false,
+      currentWaypointIndex:   0,
+      showWaypointArrival:    false,
+      waypointArrivalMessage: '',
     );
   }
 
