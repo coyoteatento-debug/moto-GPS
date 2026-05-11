@@ -2,8 +2,6 @@ import 'dart:async';
 import 'dart:math';
 import 'package:flutter/scheduler.dart';
 
-/// Interpolador continuo de ubicación a 60fps
-/// Elimina los saltos del GPS animando suavemente entre puntos reales
 class SmoothLocationService {
 
   static final SmoothLocationService _instance =
@@ -12,7 +10,6 @@ class SmoothLocationService {
   SmoothLocationService._internal();
 
   // ── Estado interno ───────────────────────────────────
-
   double? _fromLat;
   double? _fromLng;
   double? _fromHeading;
@@ -21,23 +18,24 @@ class SmoothLocationService {
   double? _toLng;
   double? _toHeading;
 
+  // Dead reckoning — velocidad y rumbo actuales
+  double _speedMs  = 0.0;
+  double _bearingR = 0.0; // radianes
+
   DateTime? _animStartTime;
   Duration  _animDuration = const Duration(milliseconds: 1000);
 
-  Ticker?        _ticker;
-  StreamController<SmoothPosition>? _controller;
-
+  Ticker?                            _ticker;
+  StreamController<SmoothPosition>?  _controller;
   bool _isRunning = false;
 
   // ── API pública ──────────────────────────────────────
 
-  /// Stream continuo de posiciones interpoladas a 60fps
   Stream<SmoothPosition> get positionStream {
     _controller ??= StreamController<SmoothPosition>.broadcast();
     return _controller!.stream;
   }
 
-  /// Inicia el interpolador — llama esto una sola vez al iniciar tracking
   void start(TickerProvider vsync) {
     if (_isRunning) return;
     _isRunning = true;
@@ -45,8 +43,6 @@ class SmoothLocationService {
     _ticker = vsync.createTicker(_onTick)..start();
   }
 
-  /// Alimenta una nueva posición GPS real
-  /// Llama esto cada vez que llega una posición del GPS
   void updatePosition({
     required double lat,
     required double lng,
@@ -55,8 +51,10 @@ class SmoothLocationService {
   }) {
     final now = DateTime.now();
 
+    _speedMs  = speedMs;
+    _bearingR = heading * pi / 180.0;
+
     if (_fromLat == null) {
-      // Primera posición — inicializar sin animación
       _fromLat     = lat;
       _fromLng     = lng;
       _fromHeading = heading;
@@ -67,26 +65,20 @@ class SmoothLocationService {
       return;
     }
 
-    // Calcular duración dinámica basada en velocidad
-    // A mayor velocidad → animación más rápida para mayor precisión
-    final duration = _calcDuration(speedMs);
-
-    // El punto de partida es la posición interpolada actual
+    // Snapshot de la posición interpolada actual como punto de partida
     final progress = _currentProgress(now);
     _fromLat     = _lerp(_fromLat!, _toLat!, progress);
     _fromLng     = _lerpLng(_fromLng!, _toLng!, progress);
     _fromHeading = _lerpAngle(_fromHeading!, _toHeading!, progress);
 
-    // El destino es la nueva posición GPS
     _toLat       = lat;
     _toLng       = lng;
     _toHeading   = heading;
 
-    _animDuration  = duration;
+    _animDuration  = _calcDuration(speedMs);
     _animStartTime = now;
   }
 
-  /// Detiene el interpolador y libera recursos
   Future<void> stop() async {
     _isRunning = false;
     _ticker?.stop();
@@ -98,7 +90,7 @@ class SmoothLocationService {
     _controller = null;
   }
 
-  // ── Ticker a 60fps ───────────────────────────────────
+  // ── Ticker a 30fps ───────────────────────────────────
 
   DateTime _lastTick = DateTime.fromMillisecondsSinceEpoch(0);
 
@@ -107,16 +99,30 @@ class SmoothLocationService {
     if (_fromLat == null || _toLat == null) return;
     if (_controller == null || !(_controller!.hasListener)) return;
 
-    // Limitar a 30fps internamente para reducir carga de CPU
     final now = DateTime.now();
-    if (now.difference(_lastTick).inMilliseconds < 33) return;
+    if (now.difference(_lastTick).inMilliseconds < 33) return; // 30fps
     _lastTick = now;
 
     final progress = _currentProgress(now);
 
-    final lat     = _lerp(_fromLat!, _toLat!, progress);
-    final lng     = _lerpLng(_fromLng!, _toLng!, progress);
-    final heading = _lerpAngle(_fromHeading!, _toHeading!, progress);
+    double lat     = _lerp(_fromLat!, _toLat!, progress);
+    double lng     = _lerpLng(_fromLng!, _toLng!, progress);
+    double heading = _lerpAngle(_fromHeading!, _toHeading!, progress);
+
+    // Dead reckoning — extrapolar posición más allá del target GPS
+    // cuando la animación ya completó el 95% y el usuario sigue moviéndose
+    if (progress >= 0.95 && _speedMs > 0.5) {
+      final extraMs    = now.difference(_animStartTime!).inMilliseconds
+                         - _animDuration.inMilliseconds;
+      final extraSec   = (extraMs / 1000.0).clamp(0.0, 0.5);
+      final distMeters = _speedMs * extraSec;
+      const R          = 6371000.0;
+      final dLat       = (distMeters * cos(_bearingR)) / R;
+      final dLng       = (distMeters * sin(_bearingR)) /
+                         (R * cos(_toLat! * pi / 180));
+      lat += dLat * 180 / pi;
+      lng += dLng * 180 / pi;
+    }
 
     _controller!.add(SmoothPosition(
       latitude:  lat,
@@ -127,7 +133,6 @@ class SmoothLocationService {
 
   // ── Helpers matemáticos ──────────────────────────────
 
-  /// Progreso actual de la animación entre 0.0 y 1.0
   double _currentProgress(DateTime now) {
     if (_animStartTime == null) return 1.0;
     final elapsed = now.difference(_animStartTime!).inMilliseconds;
@@ -135,47 +140,36 @@ class SmoothLocationService {
     return (elapsed / total).clamp(0.0, 1.0);
   }
 
-  /// Interpolación lineal con easing suave (ease in-out)
+  // Ease-out cúbico — arranca rápido y desacelera suavemente
+  // Más natural para tracking continuo que ease in-out
+  double _easeOut(double t) => 1 - pow(1 - t, 3).toDouble();
+
   double _lerp(double from, double to, double t) {
-    final eased = t < 0.5
-        ? 2 * t * t
-        : 1 - pow(-2 * t + 2, 2) / 2; // ease in-out cuadrático
-    return from + (to - from) * eased;
+    return from + (to - from) * _easeOut(t);
   }
 
-  /// Interpolación de longitud (maneja el cruce del meridiano 180°)
   double _lerpLng(double from, double to, double t) {
     double delta = to - from;
     if (delta > 180)  delta -= 360;
     if (delta < -180) delta += 360;
-    final eased = t < 0.5
-        ? 2 * t * t
-        : 1 - pow(-2 * t + 2, 2) / 2;
-    return from + delta * eased;
+    return from + delta * _easeOut(t);
   }
 
-  /// Interpolación angular — maneja correctamente 359° → 1°
   double _lerpAngle(double from, double to, double t) {
     double delta = to - from;
     if (delta > 180)  delta -= 360;
     if (delta < -180) delta += 360;
-    final eased = t < 0.5
-        ? 2 * t * t
-        : 1 - pow(-2 * t + 2, 2) / 2;
-    return (from + delta * eased) % 360;
+    return (from + delta * _easeOut(t)) % 360;
   }
 
-  /// Duración dinámica según velocidad
-  /// Equilibrio entre suavidad y precisión
   Duration _calcDuration(double speedMs) {
-    if (speedMs < 2)  return const Duration(milliseconds: 1200); // peatonal
-    if (speedMs < 10) return const Duration(milliseconds: 1000); // ciudad
-    if (speedMs < 25) return const Duration(milliseconds: 850);  // carretera
-    return const Duration(milliseconds: 700);                    // autopista
+    if (speedMs < 1)  return const Duration(milliseconds: 1500); // quieto
+    if (speedMs < 3)  return const Duration(milliseconds: 1200); // peatonal
+    if (speedMs < 10) return const Duration(milliseconds: 900);  // ciudad
+    if (speedMs < 25) return const Duration(milliseconds: 750);  // carretera
+    return const Duration(milliseconds: 600);                    // autopista
   }
 }
-
-// ── Modelo de posición suavizada ─────────────────────────
 
 class SmoothPosition {
   final double latitude;
