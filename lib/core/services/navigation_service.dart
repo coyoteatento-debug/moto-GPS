@@ -31,17 +31,19 @@ class NavigationService {
   NavigationService(this._api, this._geo);
   
   // ── Obtener rutas ─────────────────────────────────────
-  Future<List<RouteData>> getRoutes({
+  Future<List<RouteResult>> getRoutes({
     required double originLat,
     required double originLng,
     required double destLat,
     required double destLng,
+    List<Map<String, dynamic>> waypoints = const [],
   }) async {
     final data = await _api.getRoute(
       originLat: originLat,
       originLng: originLng,
-      destLat: destLat,
-      destLng: destLng,
+      destLat:   destLat,
+      destLng:   destLng,
+      waypoints: waypoints,
     );
     if (data == null) return [];
     final routes = data['routes'] as List;
