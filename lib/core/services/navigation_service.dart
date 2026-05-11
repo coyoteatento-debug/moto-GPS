@@ -31,7 +31,7 @@ class NavigationService {
   NavigationService(this._api, this._geo);
   
   // ── Obtener rutas ─────────────────────────────────────
-  Future<List<RouteResult>> getRoutes({
+  Future<List<RouteData>> getRoutes({
     required double originLat,
     required double originLng,
     required double destLat,
