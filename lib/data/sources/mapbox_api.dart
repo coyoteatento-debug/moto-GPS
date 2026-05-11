@@ -74,10 +74,17 @@ class MapboxApi {
     required double originLng,
     required double destLat,
     required double destLng,
+    List<Map<String, dynamic>> waypoints = const [],
   }) async {
+    // Construir coordenadas: origen → paradas → destino
+    final buffer = StringBuffer('$originLng,$originLat');
+    for (final wp in waypoints) {
+      buffer.write(';${wp['lng']},${wp['lat']}');
+    }
+    buffer.write(';$destLng,$destLat');
+    final coords = buffer.toString();
     final url =
-        'https://api.mapbox.com/directions/v5/mapbox/driving/'
-        '$originLng,$originLat;$destLng,$destLat'
+        'https://api.mapbox.com/directions/v5/mapbox/driving/$coords'
         '?geometries=geojson&steps=true&access_token=$token'
         '&language=es&overview=full&continue_straight=true&alternatives=true';
     final http.Response response;
