@@ -555,8 +555,8 @@ void _checkRouteDeviation(double lat, double lng) {
       if (!mounted) return;
 
       final now = DateTime.now();
-            // Pausar actualizaciones si el usuario interactuó hace menos de 400ms
-            if (now.difference(_lastUserInteraction).inMilliseconds < 400) return;
+            // Pausar actualizaciones si el usuario interactuó hace menos de 150ms
+            if (now.difference(_lastUserInteraction).inMilliseconds < 150) return;
             // Throttle a 30fps
             if (now.difference(_lastMarkerUpdate).inMilliseconds < 33) return;
             _lastMarkerUpdate = now;
