@@ -985,7 +985,7 @@ void _checkWaypointArrival(double lat, double lng) {
       onMapCreated:            _onMapCreated,
       onMapTap:                _onMapTap,
       onCameraChange:          (state) async {
-              _lastUserInteraction = DateTime.now();
+        if (!s.isProgrammaticMove) _lastUserInteraction = DateTime.now();
         if (s.isProgrammaticMove) {
           Future.delayed(const Duration(milliseconds: 1200), () {
             if (mounted) _n.setIsProgrammaticMove(false);
