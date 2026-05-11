@@ -576,8 +576,6 @@ Future<Uint8List> _createWaypointImage(int number) async {
     }
     _waypointAnnotations.clear();
   }
-
-  Future<void> _addDestinationMarker(double lat, double lng) async {
   
   Future<void> _addDestinationMarker(double lat, double lng) async {
     if (annotationManager == null || _s.pinImage == null) return;
@@ -748,8 +746,6 @@ void _checkWaypointArrival(double lat, double lng) {
     }
   }
 
-  // ── Gasolineras ───────────────────────────────────────
-    
   // ── Gasolineras ───────────────────────────────────────
   Future<void> _fetchGasolineras(double lat, double lng) async {
     if (mapboxMap == null) return;
