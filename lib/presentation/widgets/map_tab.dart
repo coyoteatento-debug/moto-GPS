@@ -156,6 +156,13 @@ class MapTab extends StatelessWidget {
   final bool userIsExploring;
   final bool isSatellite;
   final bool isNightMode;
+  final List<Map<String, dynamic>> waypoints;
+  final bool isSelectingWaypoints;
+  final bool showWaypointArrival;
+  final String waypointArrivalMessage;
+  final VoidCallback onWaypointModeToggle;
+  final VoidCallback onWaypointDone;
+  final VoidCallback onWaypointClear;
   final bool gasolinerasVisible;
   final bool gasolinerasLoading;
   final bool routeDrawn;
@@ -213,6 +220,13 @@ class MapTab extends StatelessWidget {
     required this.userIsExploring,
     required this.isSatellite,
     required this.isNightMode,
+    required this.waypoints,
+    required this.isSelectingWaypoints,
+    required this.showWaypointArrival,
+    required this.waypointArrivalMessage,
+    required this.onWaypointModeToggle,
+    required this.onWaypointDone,
+    required this.onWaypointClear,
     required this.gasolinerasVisible,
     required this.gasolinerasLoading,
     required this.routeDrawn,
@@ -355,6 +369,85 @@ class MapTab extends StatelessWidget {
           onCameraChangeListener: onCameraChange,
         ),
       ),
+
+      // ── Banner modo selección de paradas ───────────────
+      if (isSelectingWaypoints)
+        Positioned(
+          top: 0, left: 0, right: 0,
+          child: Container(
+            padding: const EdgeInsets.fromLTRB(16, 48, 16, 12),
+            decoration: const BoxDecoration(
+              color: Color(0xFFE65100),
+              borderRadius: BorderRadius.vertical(
+                  bottom: Radius.circular(16)),
+              boxShadow: [BoxShadow(
+                  color: Colors.black38, blurRadius: 8,
+                  offset: Offset(0, 3))],
+            ),
+            child: Row(children: [
+              const Icon(Icons.place, color: Colors.white, size: 22),
+              const SizedBox(width: 8),
+              Expanded(child: Text(
+                waypoints.isEmpty
+                    ? 'Toca el mapa para agregar paradas'
+                    : 'Paradas: ${waypoints.length} — toca para agregar más',
+                style: const TextStyle(
+                    color: Colors.white,
+                    fontWeight: FontWeight.bold,
+                    fontSize: 14),
+              )),
+              if (waypoints.isNotEmpty)
+                GestureDetector(
+                  onTap: onWaypointClear,
+                  child: const Padding(
+                    padding: EdgeInsets.symmetric(horizontal: 8),
+                    child: Icon(Icons.delete_outline,
+                        color: Colors.white70, size: 20),
+                  ),
+                ),
+              ElevatedButton(
+                onPressed: onWaypointDone,
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: Colors.white,
+                  foregroundColor: const Color(0xFFE65100),
+                  padding: const EdgeInsets.symmetric(
+                      horizontal: 14, vertical: 8),
+                  shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(10)),
+                ),
+                child: const Text('Listo',
+                    style: TextStyle(fontWeight: FontWeight.bold)),
+              ),
+            ]),
+          ),
+        ),
+
+      // ── Banner llegada a parada ─────────────────────────
+      if (showWaypointArrival)
+        Positioned(
+          top: navigating ? 130 : 50,
+          left: 16, right: 16,
+          child: Container(
+            padding: const EdgeInsets.symmetric(
+                horizontal: 16, vertical: 12),
+            decoration: BoxDecoration(
+              color: Colors.deepOrange.shade700,
+              borderRadius: BorderRadius.circular(14),
+              boxShadow: const [BoxShadow(
+                  color: Colors.black38, blurRadius: 10,
+                  offset: Offset(0, 4))],
+            ),
+            child: Row(children: [
+              const Icon(Icons.flag, color: Colors.white, size: 22),
+              const SizedBox(width: 10),
+              Text(waypointArrivalMessage,
+                  style: const TextStyle(
+                      color: Colors.white,
+                      fontWeight: FontWeight.bold,
+                      fontSize: 15)),
+            ]),
+          ),
+        ),
 
       // ── Botón búsqueda ─────────────────────────────────
       if (!navigating)
@@ -542,9 +635,78 @@ class MapTab extends StatelessWidget {
                 style: const TextStyle(color: Colors.grey, fontSize: 12),
               ),
               const SizedBox(height: 14),
+              // Paradas activas
+              if (waypoints.isNotEmpty)
+                Padding(
+                  padding: const EdgeInsets.only(bottom: 10),
+                  child: Wrap(
+                    spacing: 6, runSpacing: 4,
+                    children: waypoints.map((wp) => Chip(
+                      avatar: CircleAvatar(
+                        backgroundColor: Colors.deepOrange,
+                        child: Text('${wp['index']}',
+                            style: const TextStyle(
+                                color: Colors.white,
+                                fontSize: 11,
+                                fontWeight: FontWeight.bold)),
+                      ),
+                      label: Text('Parada ${wp['index']}',
+                          style: const TextStyle(fontSize: 12)),
+                      backgroundColor: Colors.orange.shade50,
+                      padding: EdgeInsets.zero,
+                    )).toList(),
+                  ),
+                ),
+              // Botón agregar paradas
+              GestureDetector(
+                onTap: onWaypointModeToggle,
+                child: Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.symmetric(vertical: 10),
+                  margin: const EdgeInsets.only(bottom: 10),
+                  decoration: BoxDecoration(
+                    color: isSelectingWaypoints
+                        ? Colors.deepOrange.shade50
+                        : Colors.grey.shade100,
+                    borderRadius: BorderRadius.circular(10),
+                    border: Border.all(
+                      color: isSelectingWaypoints
+                          ? Colors.deepOrange
+                          : Colors.grey.shade300,
+                    ),
+                  ),
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Icon(
+                        isSelectingWaypoints
+                            ? Icons.check_circle
+                            : Icons.add_location_alt_outlined,
+                        color: isSelectingWaypoints
+                            ? Colors.deepOrange
+                            : Colors.grey.shade600,
+                        size: 18,
+                      ),
+                      const SizedBox(width: 6),
+                      Text(
+                        isSelectingWaypoints
+                            ? 'Seleccionando paradas...'
+                            : 'Agregar paradas',
+                        style: TextStyle(
+                          color: isSelectingWaypoints
+                              ? Colors.deepOrange
+                              : Colors.grey.shade600,
+                          fontWeight: FontWeight.w600,
+                          fontSize: 13,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
               Row(children: [
                 Expanded(child: OutlinedButton.icon(
-                  onPressed: onTapCancel,
+                  onPressed: onCancelRoute,
                   icon: const Icon(Icons.close, color: Colors.red),
                   label: const Text('Cancelar',
                       style: TextStyle(color: Colors.red)),
@@ -557,12 +719,12 @@ class MapTab extends StatelessWidget {
                 )),
                 const SizedBox(width: 12),
                 Expanded(child: ElevatedButton.icon(
-                  onPressed: onTapConfirm,
-                  icon: const Icon(Icons.directions, color: Colors.white),
-                  label: const Text('Trazar ruta',
-                      style: TextStyle(
-                          color: Colors.white,
-                          fontWeight: FontWeight.bold)),
+                  onPressed: onStartNavigation,
+                  icon: const Icon(Icons.navigation, color: Colors.white),
+                  label: const Text('¡Ir!', style: TextStyle(
+                      color: Colors.white,
+                      fontWeight: FontWeight.bold,
+                      fontSize: 16)),
                   style: ElevatedButton.styleFrom(
                     backgroundColor: Colors.blue[700],
                     padding: const EdgeInsets.symmetric(vertical: 12),
