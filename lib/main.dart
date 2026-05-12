@@ -487,15 +487,17 @@ void _checkRouteDeviation(double lat, double lng) {
 
   Future<void> _confirmTappedDestination() async {
     if (_s.tappedLat == null || _s.tappedLng == null) return;
+    final lat = _s.tappedLat!;
+    final lng = _s.tappedLng!;
     String placeName = 'Destino seleccionado';
     try {
-      placeName = await _mapboxApi.reverseGeocode(_s.tappedLat!, _s.tappedLng!);
+      placeName = await _mapboxApi.reverseGeocode(lat, lng);
     } catch (_) {}
     _n.update((s) => s.copyWith(
-      selectedPlace:  {'name': placeName, 'lat': s.tappedLat, 'lng': s.tappedLng},
+      selectedPlace:  {'name': placeName, 'lat': lat, 'lng': lng},
       showTapConfirm: false,
     ));
-    await _getRoute(_s.tappedLat!, _s.tappedLng!);
+    await _getRoute(lat, lng);
   }
 
   Future<void> _cancelTap() async {
