@@ -549,9 +549,30 @@ Future<Uint8List> _createWaypointImage(int number) async {
       ui.Offset.zero,
       ui.Paint(),
     );
+
+    final textPainter = TextPainter(
+      text: TextSpan(
+        text: '$number',
+        style: const TextStyle(
+          color:      Color(0xFFFFFFFF),
+          fontSize:   28,
+          fontWeight: FontWeight.bold,
+        ),
+      ),
+      textDirection: TextDirection.ltr,
+    );
+    textPainter.layout();
+    textPainter.paint(
+      canvas2,
+      ui.Offset(
+        (size - textPainter.width)  / 2,
+        (size - textPainter.height) / 2,
+      ),
+    );
+
     final picture2 = recorder2.endRecording();
-    final image2 = await picture2.toImage(size.toInt(), size.toInt());
-    final bytes2 = await image2.toByteData(format: ui.ImageByteFormat.png);
+    final image2   = await picture2.toImage(size.toInt(), size.toInt());
+    final bytes2   = await image2.toByteData(format: ui.ImageByteFormat.png);
     return bytes2!.buffer.asUint8List();
   }
 
