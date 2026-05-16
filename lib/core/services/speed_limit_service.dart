@@ -1,3 +1,4 @@
+import 'dart:math';
 import 'dart:convert';
 import 'package:http/http.dart' as http;
 
@@ -106,10 +107,13 @@ class SpeedLimitService {
   /// Distancia aproximada en metros entre dos puntos
   double _distanceBetween(double lat1, double lng1, double lat2, double lng2) {
     const earthRadius = 6371000.0;
-    final dLat = (lat2 - lat1) * 3.14159265 / 180;
-    final dLng = (lng2 - lng1) * 3.14159265 / 180;
-    final a = dLat * dLat + dLng * dLng;
-    return earthRadius * a;
+    const toRad = 3.14159265 / 180;
+    final dLat = (lat2 - lat1) * toRad;
+    final dLng = (lng2 - lng1) * toRad;
+    final a = sin(dLat / 2) * sin(dLat / 2) +
+              cos(lat1 * toRad) * cos(lat2 * toRad) *
+              sin(dLng / 2) * sin(dLng / 2);
+    return earthRadius * 2 * atan2(sqrt(a), sqrt(1 - a));
   }
 }
 
