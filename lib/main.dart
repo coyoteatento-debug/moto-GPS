@@ -268,20 +268,27 @@ Future<void> _speak(String text) async {
   }
 
   // ── Permisos ──────────────────────────────────────────
+  bool _permissionFlowRunning = false;
+
   Future<void> _requestPermissions() async {
-    final granted = await _requestLocationPermissions();
-    if (granted) {
-      await _getInitialPosition();
-      _startLocationTracking();
-    } else {
-      // Esperar y reintentar por si el usuario tarda en decidir
-      await Future.delayed(const Duration(seconds: 2));
-      final permission = await Geolocator.checkPermission();
-      if (permission == LocationPermission.always ||
-          permission == LocationPermission.whileInUse) {
+    if (_permissionFlowRunning) return;
+    _permissionFlowRunning = true;
+    try {
+      final granted = await _requestLocationPermissions();
+      if (granted) {
         await _getInitialPosition();
         _startLocationTracking();
+      } else {
+        await Future.delayed(const Duration(seconds: 2));
+        final permission = await Geolocator.checkPermission();
+        if (permission == LocationPermission.always ||
+            permission == LocationPermission.whileInUse) {
+          await _getInitialPosition();
+          _startLocationTracking();
+        }
       }
+    } finally {
+      _permissionFlowRunning = false;
     }
   }
 
