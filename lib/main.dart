@@ -409,29 +409,22 @@ void _startNightModeTimer() {
 }
   
 void _checkRouteDeviation(double lat, double lng) {
-    if (!_s.navigating || _s.routeCoordinates.isEmpty || _s.isRecalculating) return;
+  if (!_s.navigating || _s.routeCoordinates.isEmpty || _s.isRecalculating) return;
 
-    if (_s.routeSteps.isNotEmpty && _s.currentStepIndex < _s.routeSteps.length) {
-      final loc     = _s.routeSteps[_s.currentStepIndex]['location'] as List;
-      final stepLat = (loc[1] as num).toDouble();
-      final stepLng = (loc[0] as num).toDouble();
-      if (_geo.distanceBetween(lat, lng, stepLat, stepLng) < 120) return;
-    }
+  if (_lastRecalcTime != null &&
+      DateTime.now().difference(_lastRecalcTime!).inSeconds < 20) return;
 
-    if (_lastRecalcTime != null &&
-        DateTime.now().difference(_lastRecalcTime!).inSeconds < 20) return;
-
-    if (_navService.isDeviated(lat, lng, _s.routeCoordinates)) {
-      _deviationCount++;
-      if (_deviationCount >= 3) {
-        _deviationCount = 0;
-        _lastRecalcTime = DateTime.now();
-        _recalculateRoute(lat, lng);
-      }
-    } else {
+  if (_navService.isDeviated(lat, lng, _s.routeCoordinates)) {
+    _deviationCount++;
+    if (_deviationCount >= 3) {
       _deviationCount = 0;
+      _lastRecalcTime = DateTime.now();
+      _recalculateRoute(lat, lng);
     }
+  } else {
+    _deviationCount = 0;
   }
+}
   
   Future<void> _recalculateRoute(double lat, double lng) async {
     if (_s.selectedPlace == null) return;
