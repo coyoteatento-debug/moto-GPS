@@ -59,7 +59,6 @@ jobs:
 
       - name: Clean Gradle
         run: |
-          flutter clean
           cd android && ./gradlew clean --no-daemon || true
           cd ..
       
