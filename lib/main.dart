@@ -238,8 +238,11 @@ Future<void> _speak(String text) async {
       );
       if (token != _searchToken) return;
       _n.setSearchResults(results);
-    } catch (_) {}
-    if (token == _searchToken) _n.setSearchLoading(false);
+    } catch (_) {
+      if (token == _searchToken) _n.setSearchResults([]);
+    } finally {
+      if (token == _searchToken) _n.setSearchLoading(false);
+    }
   }
 
   Future<void> _selectSearchResult(Map<String, dynamic> place) async {
