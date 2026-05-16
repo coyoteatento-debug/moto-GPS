@@ -24,10 +24,11 @@ class PrefsSource {
 
   // ── Viajes ────────────────────────────────────────────
   Future<void> saveTrips(List<TripRecord> trips) async {
-    final prefs = await _instance;
+    final prefs   = await _instance;
+    final limited = trips.take(50).toList(); // máximo 50 viajes guardados
     await prefs.setString(
       'trip_records',
-      json.encode(trips.map((t) => t.toJson()).toList()),
+      json.encode(limited.map((t) => t.toJson()).toList()),
     );
   }
 
