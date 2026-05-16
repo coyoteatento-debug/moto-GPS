@@ -178,6 +178,18 @@ Future<void> _speak(String text) async {
     );
   }
 
+Future<String?> _getBestLocale() async {
+  final locales = await _speech.locales();
+  for (final preferred in ['es-MX', 'es-US']) {
+    if (locales.any((l) => l.localeId == preferred)) return preferred;
+  }
+  final anySpanish = locales
+      .where((l) => l.localeId.startsWith('es'))
+      .map((l) => l.localeId)
+      .firstOrNull;
+  return anySpanish;
+}
+  
   Future<void> _startVoiceSearch() async {
     if (!_speechAvailable) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -214,7 +226,7 @@ Future<void> _speak(String text) async {
           setState(() => _isListening = false);
         }
       },
-      localeId:          'es-MX',
+      localeId:          await _getBestLocale(),
       listenFor:         const Duration(seconds: 10),
       pauseFor:          const Duration(seconds: 3),
       partialResults:    true,
