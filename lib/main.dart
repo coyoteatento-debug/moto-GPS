@@ -434,7 +434,7 @@ void _checkRouteDeviation(double lat, double lng) {
     final destLat = (_s.selectedPlace!['lat'] as num).toDouble();
     final destLng = (_s.selectedPlace!['lng'] as num).toDouble();
 
-    await _getRoute(destLat, destLng);
+    await _getRoute(destLat, destLng, fromWaypointIndex: _s.currentWaypointIndex);
     _n.setIsRecalculating(false);
   }
   
@@ -806,16 +806,23 @@ void _checkWaypointArrival(double lat, double lng) {
   }
 
   // ── Ruta ──────────────────────────────────────────────
-  Future<void> _getRoute(double destLat, double destLng) async {
+  Future<void> _getRoute(double destLat, double destLng,
+      {int fromWaypointIndex = 0}) async {
     if (_s.currentPosition == null) return;
     try {
+      // Solo los waypoints pendientes
+      final pendingWaypoints = _s.waypoints.length > fromWaypointIndex
+          ? _s.waypoints.sublist(fromWaypointIndex)
+          : <Map<String, dynamic>>[];
+
       final routes = await _navService.getRoutes(
         originLat: _s.currentPosition!.latitude,
         originLng: _s.currentPosition!.longitude,
         destLat:   destLat,
         destLng:   destLng,
-        waypoints: _s.waypoints,
+        waypoints: pendingWaypoints,
       );
+   
       if (routes.isEmpty) return;
       _n.setRouteData(
           distance:  routes[0].distance,
