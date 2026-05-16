@@ -1,12 +1,12 @@
 package com.coyoteatento.motogps
 
 import android.app.*
-import android.content.Context
 import android.content.Intent
 import android.content.pm.ServiceInfo
 import android.os.*
 import android.util.Log
 import androidx.core.app.NotificationCompat
+import androidx.localbroadcastmanager.content.LocalBroadcastManager
 import com.google.android.gms.location.*
 
 class LocationForegroundService : Service() {
@@ -18,32 +18,37 @@ class LocationForegroundService : Service() {
         const val ACTION_STOP       = "ACTION_STOP"
         const val ACTION_UPDATE_TXT = "ACTION_UPDATE_TXT"
         const val EXTRA_INSTRUCTION = "instruction"
+        const val ACTION_LOCATION   = "com.coyoteatento.motogps.LOCATION_UPDATE"
+        const val EXTRA_LAT         = "lat"
+        const val EXTRA_LNG         = "lng"
+        const val EXTRA_SPEED       = "speed"
+        const val EXTRA_BEARING     = "bearing"
         private const val TAG       = "MotoGPS_Service"
     }
 
-    // Campo de instancia — sobrevive a recreaciones del servicio
-    var onLocationUpdate: ((Double, Double, Float, Float) -> Unit)? = null
-
     private lateinit var fusedClient: FusedLocationProviderClient
     private lateinit var notificationManager: NotificationManager
+    private lateinit var localBroadcast: LocalBroadcastManager
     private var currentInstruction = "Navegando..."
 
     private val locationCallback = object : LocationCallback() {
         override fun onLocationResult(result: LocationResult) {
             val location = result.lastLocation ?: return
-            onLocationUpdate?.invoke(
-                location.latitude,
-                location.longitude,
-                location.speed,
-                location.bearing
-            )
+            val intent = Intent(ACTION_LOCATION).apply {
+                putExtra(EXTRA_LAT,     location.latitude)
+                putExtra(EXTRA_LNG,     location.longitude)
+                putExtra(EXTRA_SPEED,   location.speed)
+                putExtra(EXTRA_BEARING, location.bearing)
+            }
+            localBroadcast.sendBroadcast(intent)
         }
     }
 
     override fun onCreate() {
         super.onCreate()
         notificationManager = getSystemService(NOTIFICATION_SERVICE) as NotificationManager
-        fusedClient = LocationServices.getFusedLocationProviderClient(this)
+        fusedClient         = LocationServices.getFusedLocationProviderClient(this)
+        localBroadcast      = LocalBroadcastManager.getInstance(this)
         createNotificationChannel()
         Log.d(TAG, "Servicio creado")
     }
@@ -71,7 +76,6 @@ class LocationForegroundService : Service() {
 
     override fun onDestroy() {
         fusedClient.removeLocationUpdates(locationCallback)
-        onLocationUpdate = null
         Log.d(TAG, "Servicio destruido")
         super.onDestroy()
     }
