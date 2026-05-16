@@ -51,8 +51,8 @@ class BackgroundService {
     _locationSub ??= _eventChannel
         .receiveBroadcastStream()
         .listen((dynamic data) {
-          if (data is Map) {
-            _controller?.add(LocationData(
+          if (data is Map && _controller != null && !_controller!.isClosed) {
+            _controller!.add(LocationData(
               latitude:  (data['latitude']  as num).toDouble(),
               longitude: (data['longitude'] as num).toDouble(),
               speed:     (data['speed']     as num).toDouble(),
@@ -63,6 +63,19 @@ class BackgroundService {
           print('[BackgroundService] Error en stream: $error');
         });
     return _controller!.stream;
+  }
+
+  @override
+  Future<void> stop() async {
+    try {
+      await _methodChannel.invokeMethod('stopService');
+      await _locationSub?.cancel();
+      _locationSub = null;
+      await _controller?.close();
+      _controller = null;
+    } on PlatformException catch (e) {
+      print('[BackgroundService] Error al detener: ${e.message}');
+    }
   }
 }
 
