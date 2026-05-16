@@ -19,9 +19,10 @@ class LocationForegroundService : Service() {
         const val ACTION_UPDATE_TXT = "ACTION_UPDATE_TXT"
         const val EXTRA_INSTRUCTION = "instruction"
         private const val TAG       = "MotoGPS_Service"
-
-        var onLocationUpdate: ((Double, Double, Float, Float) -> Unit)? = null
     }
+
+    // Campo de instancia — sobrevive a recreaciones del servicio
+    var onLocationUpdate: ((Double, Double, Float, Float) -> Unit)? = null
 
     private lateinit var fusedClient: FusedLocationProviderClient
     private lateinit var notificationManager: NotificationManager
