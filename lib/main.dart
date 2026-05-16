@@ -398,23 +398,15 @@ void _startNightModeTimer() {
   }
 
 // ── Límite de velocidad ───────────────────────────────
-  DateTime? _lastSpeedLimitCheck;
-
   Future<void> _updateSpeedLimit(double lat, double lng) async {
-    // Solo consultar cada 30 segundos para no saturar la API
-    if (_lastSpeedLimitCheck != null &&
-        DateTime.now().difference(_lastSpeedLimitCheck!).inSeconds < 30) return;
-    _lastSpeedLimitCheck = DateTime.now();
+  final limit = await _speedLimitService.getSpeedLimit(lat, lng);
+  if (mounted) _n.setSpeedLimit(limit);
 
-    final limit = await _speedLimitService.getSpeedLimit(lat, lng);
-    if (mounted) _n.setSpeedLimit(limit);
-
-    // Alerta por voz si excede el límite
-    final status = SpeedStatus.evaluate(_s.currentSpeed, limit);
-    if (status.level == SpeedAlertLevel.danger) {
-      _speak('Exceso de velocidad');
-    }
+  final status = SpeedStatus.evaluate(_s.currentSpeed, limit);
+  if (status.level == SpeedAlertLevel.danger) {
+    _speak('Exceso de velocidad');
   }
+}
   
 void _checkRouteDeviation(double lat, double lng) {
     if (!_s.navigating || _s.routeCoordinates.isEmpty || _s.isRecalculating) return;
