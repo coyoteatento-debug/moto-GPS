@@ -31,6 +31,8 @@ class GeoUtils {
       double lat, double lng, List<List<double>> routeCoords,
       {int lastIdx = 0}) {
     if (routeCoords.isEmpty) return 0;
+
+    // Búsqueda local en ventana normal
     final start = (lastIdx - 10).clamp(0, routeCoords.length - 1);
     final end   = (lastIdx + 25).clamp(0, routeCoords.length);
     double minDist = double.infinity;
@@ -43,6 +45,20 @@ class GeoUtils {
         idx = i;
       }
     }
+
+    // Si el punto más cercano está a más de 200m, hubo un salto de GPS —
+    // hacer búsqueda global para reanclar el índice correctamente
+    if (minDist > 200) {
+      for (int i = 0; i < routeCoords.length; i++) {
+        final d = distanceBetween(
+            lat, lng, routeCoords[i][1], routeCoords[i][0]);
+        if (d < minDist) {
+          minDist = d;
+          idx = i;
+        }
+      }
+    }
+
     return idx;
   }
 
