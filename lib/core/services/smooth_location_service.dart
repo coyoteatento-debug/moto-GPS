@@ -1,6 +1,5 @@
 import 'dart:async';
 import 'dart:math';
-import 'package:flutter/scheduler.dart';
 
 class SmoothLocationService {
 
@@ -25,7 +24,7 @@ class SmoothLocationService {
   DateTime? _animStartTime;
   Duration  _animDuration = const Duration(milliseconds: 1000);
 
-  Ticker?                            _ticker;
+  Timer? _timer;
   StreamController<SmoothPosition>?  _controller;
   bool _isRunning = false;
 
@@ -36,11 +35,14 @@ class SmoothLocationService {
     return _controller!.stream;
   }
 
-  void start(TickerProvider vsync) {
+  void start() {
     if (_isRunning) return;
     _isRunning = true;
     _controller ??= StreamController<SmoothPosition>.broadcast();
-    _ticker = vsync.createTicker(_onTick)..start();
+    _timer = Timer.periodic(
+      const Duration(milliseconds: 33),
+      (_) => _onTick(),
+    );
   }
 
   void updatePosition({
@@ -81,9 +83,8 @@ class SmoothLocationService {
 
   Future<void> stop() async {
     _isRunning = false;
-    _ticker?.stop();
-    _ticker?.dispose();
-    _ticker = null;
+    _timer?.cancel();
+    _timer = null;
     _fromLat = _fromLng = _fromHeading = null;
     _toLat   = _toLng   = _toHeading   = null;
     await _controller?.close();
@@ -92,16 +93,12 @@ class SmoothLocationService {
 
   // ── Ticker a 30fps ───────────────────────────────────
 
-  DateTime _lastTick = DateTime.fromMillisecondsSinceEpoch(0);
-
-  void _onTick(Duration elapsed) {
+  void _onTick() {
     if (!_isRunning) return;
     if (_fromLat == null || _toLat == null) return;
     if (_controller == null || !(_controller!.hasListener)) return;
 
     final now = DateTime.now();
-    if (now.difference(_lastTick).inMilliseconds < 33) return; // 30fps
-    _lastTick = now;
 
     final progress = _currentProgress(now);
 
