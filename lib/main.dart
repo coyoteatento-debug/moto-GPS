@@ -53,6 +53,7 @@ class _MotoGPSAppState extends ConsumerState<MotoGPSApp>
   MapNotifier get _n => ref.read(mapProvider.notifier);
   MapState    get _s => ref.read(mapProvider);
   mapbox.MapboxMap? mapboxMap;
+  final Completer<void> _mapReadyCompleter = Completer<void>();
   mapbox.PointAnnotationManager? annotationManager;
   mapbox.PointAnnotation? motoAnnotation;
   mapbox.PointAnnotation? destinationAnnotation;
@@ -299,8 +300,12 @@ Future<String?> _getBestLocale() async {
             ),
           );
         }
+        return;
       }
-      // Si granted=true, _onMapCreated se encarga de iniciar el GPS
+      // Esperar a que el mapa esté completamente listo
+      await _mapReadyCompleter.future;
+      await _getInitialPosition();
+      _startLocationTracking();
     } finally {
       _permissionFlowRunning = false;
     }
@@ -350,14 +355,6 @@ Future<String?> _getBestLocale() async {
         _s.currentPosition!.longitude,
         _s.currentPosition!.heading,
       );
-    } else {
-      // El mapa está listo — ahora sí iniciar GPS
-      final permission = await Geolocator.checkPermission();
-      if (permission == LocationPermission.always ||
-          permission == LocationPermission.whileInUse) {
-        await _getInitialPosition();
-        _startLocationTracking();
-      }
     }
   }   
 
