@@ -1162,16 +1162,26 @@ void _checkWaypointArrival(double lat, double lng) {
     super.didChangeAppLifecycleState(state);
     switch (state) {
       case AppLifecycleState.paused:
+        // Solo pasar a background si el tracking ya está activo
+        if (_locationSubscription != null) {
+          _gpsService.onAppBackground();
+        }
+        break;
       case AppLifecycleState.inactive:
-        _gpsService.onAppBackground();
+        // inactive ocurre durante diálogos del sistema — ignorar completamente
         break;
       case AppLifecycleState.resumed:
-        _gpsService.onAppForeground();
         _applyNightOrDayStyle();
         final permission = await Geolocator.checkPermission();
         final hasPermission = permission == LocationPermission.always ||
                               permission == LocationPermission.whileInUse;
-        if (hasPermission && _s.currentPosition == null) {
+        if (!hasPermission) break;
+        if (_locationSubscription != null) {
+          // Tracking ya activo — solo restaurar foreground
+          _gpsService.onAppForeground();
+        } else {
+          // Primera vez o tracking no iniciado — iniciar GPS
+          await _mapReadyCompleter.future;
           await _getInitialPosition();
           _startLocationTracking();
         }
