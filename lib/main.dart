@@ -290,10 +290,7 @@ Future<String?> _getBestLocale() async {
     _permissionFlowRunning = true;
     try {
       final granted = await _requestLocationPermissions();
-      if (granted) {
-        await _getInitialPosition();
-        _startLocationTracking();
-      } else {
+      if (!granted) {
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(
@@ -303,6 +300,7 @@ Future<String?> _getBestLocale() async {
           );
         }
       }
+      // Si granted=true, _onMapCreated se encarga de iniciar el GPS
     } finally {
       _permissionFlowRunning = false;
     }
@@ -334,25 +332,34 @@ Future<String?> _getBestLocale() async {
     await Future.delayed(const Duration(milliseconds: 600));
     await _applyNightOrDayStyle();
     await _applyCustomRoadStyle();
-  // Centrar en ubicación actual si ya se obtuvo
-  if (_s.currentPosition != null) {
-  _n.setIsProgrammaticMove(true);
-  mapboxMap?.flyTo(
-    mapbox.CameraOptions(
-      center: mapbox.Point(coordinates: mapbox.Position(
-        _s.currentPosition!.longitude, _s.currentPosition!.latitude,
-      )),
-      zoom: 15.0, bearing: _s.currentPosition!.heading, pitch: 0.0,
-    ),
-    mapbox.MapAnimationOptions(duration: 1000, startDelay: 0),
-  );
- _updateMotoMarker(
-    _s.currentPosition!.latitude,
-    _s.currentPosition!.longitude,
-    _s.currentPosition!.heading,
-  );
- }
-}   
+
+    // Centrar en ubicación actual si ya se obtuvo
+    if (_s.currentPosition != null) {
+      _n.setIsProgrammaticMove(true);
+      mapboxMap?.flyTo(
+        mapbox.CameraOptions(
+          center: mapbox.Point(coordinates: mapbox.Position(
+            _s.currentPosition!.longitude, _s.currentPosition!.latitude,
+          )),
+          zoom: 15.0, bearing: _s.currentPosition!.heading, pitch: 0.0,
+        ),
+        mapbox.MapAnimationOptions(duration: 1000, startDelay: 0),
+      );
+      _updateMotoMarker(
+        _s.currentPosition!.latitude,
+        _s.currentPosition!.longitude,
+        _s.currentPosition!.heading,
+      );
+    } else {
+      // El mapa está listo — ahora sí iniciar GPS
+      final permission = await Geolocator.checkPermission();
+      if (permission == LocationPermission.always ||
+          permission == LocationPermission.whileInUse) {
+        await _getInitialPosition();
+        _startLocationTracking();
+      }
+    }
+  }   
 
 // ── Modo nocturno ─────────────────────────────────────
   bool _isNightTime() {
