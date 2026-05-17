@@ -92,11 +92,14 @@ class _MotoGPSAppState extends ConsumerState<MotoGPSApp>
     _startSmoothMarker();
     _loadImages();
     _startNightModeTimer();
-    _requestPermissions();
     _loadTrips();
     _initTts();
     _loadUserAvatar();
     _initSpeech();
+    // Diferir hasta que el primer frame esté completamente renderizado
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _requestPermissions();
+    });
   }
 
   @override
