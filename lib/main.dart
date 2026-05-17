@@ -88,7 +88,7 @@ class _MotoGPSAppState extends ConsumerState<MotoGPSApp>
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
-    _smoother.start(this);
+    _smoother.start();
     _startSmoothMarker();
     _loadImages();
     _startNightModeTimer();
