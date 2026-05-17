@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 import 'package:http/http.dart' as http;
 
@@ -25,8 +26,7 @@ class OverpassApi {
         'User-Agent': 'MotoGPS/1.0',
         'Accept': 'application/json',
       },
-    );
-
+    ).timeout(const Duration(seconds: 45));
     if (response.statusCode != 200) {
       throw Exception('Overpass HTTP ${response.statusCode}');
     }
