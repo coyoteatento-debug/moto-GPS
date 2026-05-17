@@ -291,12 +291,13 @@ Future<String?> _getBestLocale() async {
         await _getInitialPosition();
         _startLocationTracking();
       } else {
-        await Future.delayed(const Duration(seconds: 2));
-        final permission = await Geolocator.checkPermission();
-        if (permission == LocationPermission.always ||
-            permission == LocationPermission.whileInUse) {
-          await _getInitialPosition();
-          _startLocationTracking();
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Se necesita permiso de ubicación para navegar'),
+              duration: Duration(seconds: 4),
+            ),
+          );
         }
       }
     } finally {
@@ -306,9 +307,19 @@ Future<String?> _getBestLocale() async {
 
   Future<bool> _requestLocationPermissions() async {
     LocationPermission permission = await Geolocator.checkPermission();
+
+    if (permission == LocationPermission.deniedForever) {
+      await Geolocator.openAppSettings();
+      await Future.delayed(const Duration(seconds: 3));
+      permission = await Geolocator.checkPermission();
+      return permission == LocationPermission.always ||
+             permission == LocationPermission.whileInUse;
+    }
+
     if (permission == LocationPermission.denied) {
       permission = await Geolocator.requestPermission();
     }
+
     return permission == LocationPermission.always ||
            permission == LocationPermission.whileInUse;
   }
