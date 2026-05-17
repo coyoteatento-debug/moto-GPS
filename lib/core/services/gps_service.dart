@@ -86,15 +86,20 @@ class GpsService {
         permission == LocationPermission.deniedForever) {
       return null;
     }
-    try {
-      return await Geolocator.getCurrentPosition(
-        locationSettings: const LocationSettings(
-          accuracy: LocationAccuracy.high,
-        ),
-      );
-    } catch (_) {
-      return null;
+
+    for (int attempt = 1; attempt <= 3; attempt++) {
+      try {
+        return await Geolocator.getCurrentPosition(
+          locationSettings: const LocationSettings(
+            accuracy: LocationAccuracy.high,
+          ),
+        ).timeout(const Duration(seconds: 10));
+      } catch (_) {
+        if (attempt == 3) return null;
+        await Future.delayed(Duration(seconds: attempt * 2));
+      }
     }
+    return null;
   }
 
   // ── Streams internos ─────────────────────────────────────────────
