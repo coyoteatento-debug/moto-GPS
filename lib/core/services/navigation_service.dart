@@ -92,6 +92,10 @@ class NavigationService {
   }
 
   // ── Actualizar turno actual ───────────────────────────
+  int _lastAnnouncedStep  = -1;
+  bool _announcedEarly    = false;
+  bool _announcedFinal    = false;
+
   TurnUpdate? updateTurn(
     double lat,
     double lng,
@@ -100,6 +104,13 @@ class NavigationService {
   ) {
     if (steps.isEmpty || currentStepIndex >= steps.length) return null;
 
+    // Resetear flags cuando cambia el paso
+    if (currentStepIndex != _lastAnnouncedStep) {
+      _lastAnnouncedStep = currentStepIndex;
+      _announcedEarly    = false;
+      _announcedFinal    = false;
+    }
+
     final step    = steps[currentStepIndex];
     final loc     = step['location'] as List;
     final stepLng = (loc[0] as num).toDouble();
@@ -107,9 +118,11 @@ class NavigationService {
     final dist    = _geo.distanceBetween(lat, lng, stepLat, stepLng);
 
     String? announceText;
-    if (dist < 150 && dist >= 120) {
+    if (dist < 150 && dist >= 120 && !_announcedEarly) {
+      _announcedEarly = true;
       announceText = 'En 150 metros, ${step['instruction']}';
-    } else if (dist < 50 && dist >= 30) {
+    } else if (dist < 50 && dist >= 30 && !_announcedFinal) {
+      _announcedFinal = true;
       announceText = step['instruction'] as String;
     }
 
