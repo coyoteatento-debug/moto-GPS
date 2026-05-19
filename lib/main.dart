@@ -403,6 +403,7 @@ void _startNightModeTimer() {
 
     if (_navService.hasArrived(lat, lng, _s.routeCoordinates)) {
       if (!_s.navigating) return;
+      _n.setNavigating(false);
       final record = await _tripService.finishAndSave(
         destination:   _s.selectedPlace?['name'] ?? 'Destino',
         routeCoords:   _s.routeCoordinates,
