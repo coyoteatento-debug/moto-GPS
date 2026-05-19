@@ -230,7 +230,7 @@ Future<String?> _getBestLocale() async {
           setState(() => _isListening = false);
         }
       },
-      localeId:          await _getBestLocale(),
+      localeId:          await _getBestLocale() ?? 'es-MX',
       listenFor:         const Duration(seconds: 10),
       pauseFor:          const Duration(seconds: 3),
       partialResults:    true,
