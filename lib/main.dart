@@ -695,8 +695,6 @@ Future<Uint8List> _createWaypointImage(int number) async {
       _n.update((s) => s.copyWith(
         currentSpeed:    speed,
         currentPosition: position,
-        userIsExploring: speed > 2 && !s.navigating && !s.routeDrawn
-            ? false : s.userIsExploring,
       ));
       if (!_s.navigating) {
         _smoother.updatePosition(
