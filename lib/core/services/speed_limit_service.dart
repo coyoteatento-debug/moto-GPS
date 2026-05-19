@@ -32,15 +32,16 @@ class SpeedLimitService {
           'way[maxspeed](around:25,$lat,$lng);'
           'out tags 1;';
 
-      final uri = Uri.parse(
-        'https://overpass-api.de/api/interpreter'
-        '?data=${Uri.encodeComponent(query)}',
-      );
+      final uri = Uri.parse('https://overpass-api.de/api/interpreter');
 
-      final response = await http.get(uri, headers: {
-        'User-Agent': 'MotoGPS/1.0',
-        'Accept':     'application/json',
-      }).timeout(const Duration(seconds: 10));
+      final response = await http.post(
+        uri,
+        headers: {
+          'User-Agent':   'MotoGPS/1.0',
+          'Content-Type': 'application/x-www-form-urlencoded',
+        },
+        body: 'data=${Uri.encodeComponent(query)}',
+      ).timeout(const Duration(seconds: 10));
 
       if (response.statusCode != 200) return _lastSpeedLimit;
 
