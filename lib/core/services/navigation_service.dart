@@ -152,7 +152,8 @@ class NavigationService {
     List<List<double>> routeCoords,
   ) {
     if (routeCoords.isEmpty) return false;
-    final idx = _geo.findClosestPointIndex(lat, lng, routeCoords);
+    final idx = _geo.findClosestPointIndex(lat, lng, routeCoords,
+        lastIdx: (routeCoords.length - 10).clamp(0, routeCoords.length - 1));
     return idx >= routeCoords.length - 2;
   }
 }
