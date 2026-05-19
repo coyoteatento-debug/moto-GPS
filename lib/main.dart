@@ -566,15 +566,18 @@ Future<Uint8List> _createWaypointImage(int number) async {
     final image = await picture.toImage(size.toInt(), size.toInt());
     final bytes = await image.toByteData(format: ui.ImageByteFormat.png);
     final base = bytes!.buffer.asUint8List();
+    image.dispose();
 
     // Superponer el número usando TextPainter
     final recorder2 = ui.PictureRecorder();
     final canvas2 = ui.Canvas(recorder2);
+    final decodedBase = await decodeImageFromList(base);
     canvas2.drawImage(
-      await decodeImageFromList(base),
+      decodedBase,
       ui.Offset.zero,
       ui.Paint(),
     );
+    decodedBase.dispose();
 
     final textPainter = TextPainter(
       text: TextSpan(
