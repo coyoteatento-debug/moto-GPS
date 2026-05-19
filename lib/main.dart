@@ -337,7 +337,7 @@ Future<String?> _getBestLocale() async {
     await Future.delayed(const Duration(milliseconds: 600));
     await _applyNightOrDayStyle();
     await _applyCustomRoadStyle();
-
+    if (!_mapReadyCompleter.isCompleted) _mapReadyCompleter.complete();
     // Centrar en ubicación actual si ya se obtuvo
     if (_s.currentPosition != null) {
       _n.setIsProgrammaticMove(true);
