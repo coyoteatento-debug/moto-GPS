@@ -51,7 +51,9 @@ class NavigationService {
       final coords = (r['geometry']['coordinates'] as List)
           .map((c) => [(c[0] as num).toDouble(), (c[1] as num).toDouble()])
           .toList();
-      final steps = (r['legs'][0]['steps'] as List)
+      final legs = r['legs'] as List;
+      final steps = legs
+          .expand((leg) => leg['steps'] as List)
           .map((s) => <String, dynamic>{
                 'instruction': (s['maneuver']['instruction'] as String?) ?? '',
                 'distance':    (s['distance'] as num).toDouble(),
