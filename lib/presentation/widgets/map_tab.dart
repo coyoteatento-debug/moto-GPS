@@ -706,7 +706,7 @@ class MapTab extends StatelessWidget {
               ),
               Row(children: [
                 Expanded(child: OutlinedButton.icon(
-                  onPressed: onCancelRoute,
+                  onPressed: onTapCancel,
                   icon: const Icon(Icons.close, color: Colors.red),
                   label: const Text('Cancelar',
                       style: TextStyle(color: Colors.red)),
@@ -719,7 +719,7 @@ class MapTab extends StatelessWidget {
                 )),
                 const SizedBox(width: 12),
                 Expanded(child: ElevatedButton.icon(
-                  onPressed: onStartNavigation,
+                  onPressed: onTapConfirm,
                   icon: const Icon(Icons.navigation, color: Colors.white),
                   label: const Text('¡Ir!', style: TextStyle(
                       color: Colors.white,
