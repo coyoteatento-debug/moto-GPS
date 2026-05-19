@@ -423,7 +423,7 @@ void _startNightModeTimer() {
       return;
     }
 
-    final idx       = _geo.findClosestPointIndex(lat, lng, _s.routeCoordinates);
+    final idx       = _geo.findClosestPointIndex(lat, lng, _s.routeCoordinates, lastIdx: _s.currentStepIndex);
     final remaining = _s.routeCoordinates.sublist(idx);
     await _mapService.updateRemainingRoute(mapboxMap!, remaining);
   }
