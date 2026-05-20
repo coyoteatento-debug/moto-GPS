@@ -740,7 +740,7 @@ Future<Uint8List> _createWaypointImage(int number) async {
             position.latitude, position.longitude);
         // Detectar desvío de ruta
         _checkRouteDeviation(position.latitude, position.longitude);
-        _updateRemainingRoute(position.latitude, position.longitude);
+        await _updateRemainingRoute(position.latitude, position.longitude);
         _updateTurnByTurn(position.latitude, position.longitude);
         _checkWaypointArrival(position.latitude, position.longitude);
         _smoother.updatePosition(
