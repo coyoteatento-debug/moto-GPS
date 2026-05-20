@@ -730,7 +730,7 @@ Future<Uint8List> _createWaypointImage(int number) async {
         final snapped    = _geo.snapToRoute(position.latitude, position.longitude, _s.routeCoordinates);
         final snappedLng = snapped[0];
         final snappedLat = snapped[1];
-        final idx        = _geo.findClosestPointIndex(position.latitude, position.longitude, _s.routeCoordinates);
+        final idx        = _geo.findClosestPointIndex(position.latitude, position.longitude, _s.routeCoordinates, lastIdx: _s.currentStepIndex);
         double bearing   = position.heading;
         if (idx < _s.routeCoordinates.length - 1) {
           bearing = _geo.bearingBetween(
