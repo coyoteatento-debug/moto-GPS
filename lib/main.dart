@@ -694,7 +694,7 @@ Future<Uint8List> _createWaypointImage(int number) async {
   Future<void> _startLocationTracking() async {
     if (_locationSubscription != null) return;
     await _gpsService.startTracking();
-    _locationSubscription = _gpsService.positionStream.listen((Position position) {
+    _locationSubscription = _gpsService.positionStream.listen((Position position) async {
       if (!mounted) return;
       final speed = (position.speed < 0 ? 0 : position.speed) * 3.6;
       _n.update((s) => s.copyWith(
