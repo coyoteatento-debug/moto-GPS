@@ -1008,10 +1008,10 @@ void _checkWaypointArrival(double lat, double lng) {
       isLoading:     _s.searchLoading,
       results:       _s.searchResults,
       onChanged:     _searchPlaces,
-      onClose: () => setState(() {
+      onClose: () {
         _n.clearSearch();
         _searchController.clear();
-      }),
+      },
       onSelect:      _selectSearchResult,
       onVoiceSearch: _startVoiceSearch,
       isListening:   _isListening,
