@@ -483,7 +483,7 @@ void _checkRouteDeviation(double lat, double lng) {
   }
 
   // ── Tap mapa ──────────────────────────────────────────
-  void _onMapTap(mapbox.MapContentGestureContext context) {
+  Future<void> _onMapTap(mapbox.MapContentGestureContext context) async {
     if (_s.navigating) return;
     final lat = context.point.coordinates.lat.toDouble();
     final lng = context.point.coordinates.lng.toDouble();
@@ -502,7 +502,7 @@ void _checkRouteDeviation(double lat, double lng) {
     }
 
     _n.setTappedLocation(lat, lng);
-    _addDestinationMarker(lat, lng);
+    await _addDestinationMarker(lat, lng);
     mapboxMap?.flyTo(
       mapbox.CameraOptions(
         center: mapbox.Point(coordinates: mapbox.Position(lng, lat)),
