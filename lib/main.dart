@@ -602,6 +602,7 @@ Future<Uint8List> _createWaypointImage(int number) async {
     final picture2 = recorder2.endRecording();
     final image2   = await picture2.toImage(size.toInt(), size.toInt());
     final bytes2   = await image2.toByteData(format: ui.ImageByteFormat.png);
+    image2.dispose();
     return bytes2!.buffer.asUint8List();
   }
 
