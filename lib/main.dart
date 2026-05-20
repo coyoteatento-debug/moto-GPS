@@ -430,10 +430,11 @@ void _startNightModeTimer() {
 
 // ── Límite de velocidad ───────────────────────────────
   Future<void> _updateSpeedLimit(double lat, double lng) async {
+  final speedAtRequest = _s.currentSpeed;
   final limit = await _speedLimitService.getSpeedLimit(lat, lng);
   if (mounted) _n.setSpeedLimit(limit);
 
-  final status = SpeedStatus.evaluate(_s.currentSpeed, limit);
+  final status = SpeedStatus.evaluate(speedAtRequest, limit);
   if (status.level == SpeedAlertLevel.danger) {
     _speak('Exceso de velocidad');
   }
