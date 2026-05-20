@@ -893,6 +893,42 @@ void _checkWaypointArrival(double lat, double lng) {
     await _mapService.drawRouteOnMap(mapboxMap!, geometry, _s.alternateRoutes);
   }
 
+  Future<void> _recreateAnnotationsAfterStyleChange() async {
+    if (mapboxMap == null || !mounted) return;
+    // El annotationManager queda inválido tras loadStyleURI — recrear
+    annotationManager = await mapboxMap!.annotations
+        .createPointAnnotationManager();
+    motoAnnotation        = null;
+    destinationAnnotation = null;
+
+    // Redibujar marcador de moto
+    if (_s.currentPosition != null) {
+      await _updateMotoMarker(
+        _s.currentPosition!.latitude,
+        _s.currentPosition!.longitude,
+        _s.currentPosition!.heading,
+      );
+    }
+    // Redibujar marcador de destino
+    if (_s.selectedPlace != null && _s.pinImage != null) {
+      await _addDestinationMarker(
+        (_s.selectedPlace!['lat'] as num).toDouble(),
+        (_s.selectedPlace!['lng'] as num).toDouble(),
+      );
+    }
+    // Redibujar waypoints
+    if (_s.waypoints.isNotEmpty) {
+      _waypointAnnotations.clear();
+      for (final wp in _s.waypoints) {
+        await _addWaypointAnnotation(
+          (wp['lat'] as num).toDouble(),
+          (wp['lng'] as num).toDouble(),
+          wp['index'] as int,
+        );
+      }
+    }
+  }
+
   void _fitRouteBounds(double destLat, double destLng) {
     if (_s.currentPosition == null) return;
     final dist = _geo.distanceBetween(
@@ -1118,6 +1154,7 @@ void _checkWaypointArrival(double lat, double lng) {
       'coordinates': _s.routeCoordinates,
     });
   }
+  if (mounted) await _recreateAnnotationsAfterStyleChange();
 },
       onSatelliteToggle: () async {
         final newValue = !_s.isSatellite;
@@ -1142,6 +1179,7 @@ void _checkWaypointArrival(double lat, double lng) {
             _s.currentPosition!.longitude,
           );
         }
+        if (mounted) await _recreateAnnotationsAfterStyleChange();
       },
       onTapConfirm:            _confirmTappedDestination,
       onTapCancel:             _cancelTap,
