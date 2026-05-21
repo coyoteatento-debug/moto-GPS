@@ -107,12 +107,14 @@ class _MotoGPSAppState extends ConsumerState<MotoGPSApp>
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
     _locationSubscription?.cancel();
+    _locationSubscription = null;
     _smoothSub?.cancel();
     _smoother.stop();
     _nightModeTimer?.cancel();
     _waypointArrivalTimer?.cancel();
     WakelockPlus.disable();
     _searchController.dispose();
+    _gpsService.dispose();   // ← AGREGADO
     super.dispose();
   }
 
