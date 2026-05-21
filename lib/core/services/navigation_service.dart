@@ -96,6 +96,12 @@ class NavigationService {
   bool _announcedEarly    = false;
   bool _announcedFinal    = false;
 
+  void resetAnnouncements() {  // ← AGREGADO
+    _lastAnnouncedStep = -1;
+    _announcedEarly    = false;
+    _announcedFinal    = false;
+  }
+
   TurnUpdate? updateTurn(
     double lat,
     double lng,
