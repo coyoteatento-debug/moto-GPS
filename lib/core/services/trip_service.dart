@@ -55,7 +55,7 @@ class TripService {
     return record;
   }
 
-  void _reset() {
+  void reset() {
     _startTime           = null;
     _accumulatedDistance = 0.0;
     _lastLat             = null;
