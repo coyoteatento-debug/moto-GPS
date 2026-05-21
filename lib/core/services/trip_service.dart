@@ -51,7 +51,7 @@ class TripService {
     );
     final updated = [record, ...existingTrips];
     await _prefs.saveTrips(updated);
-    _reset();
+    reset();
     return record;
   }
 
