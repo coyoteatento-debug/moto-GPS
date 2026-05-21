@@ -571,6 +571,8 @@ Future<Uint8List> _createWaypointImage(int number) async {
     final bytes = await image.toByteData(format: ui.ImageByteFormat.png);
     final base = bytes!.buffer.asUint8List();
     image.dispose();
+    if (bytes == null) return _s.pinImage ?? Uint8List(0);
+    final base = bytes.buffer.asUint8List();
 
     // Superponer el número usando TextPainter
     final recorder2 = ui.PictureRecorder();
@@ -607,6 +609,7 @@ Future<Uint8List> _createWaypointImage(int number) async {
     final image2   = await picture2.toImage(size.toInt(), size.toInt());
     final bytes2   = await image2.toByteData(format: ui.ImageByteFormat.png);
     image2.dispose();
+    if (bytes2 == null) return _s.pinImage ?? Uint8List(0);
     return bytes2!.buffer.asUint8List();
   }
 
