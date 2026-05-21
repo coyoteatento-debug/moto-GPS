@@ -414,6 +414,7 @@ void _startNightModeTimer() {
       if (record != null && mounted) {
         _n.setTrips([record, ..._s.trips]);
       }
+      _tripService.reset();
       await _cancelRoute();
       if (mounted) ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
