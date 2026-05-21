@@ -465,6 +465,7 @@ void _checkRouteDeviation(double lat, double lng) {
     if (_s.selectedPlace == null) return;
     _n.setIsRecalculating(true);
     _speak('Recalculando ruta');
+    _navService.resetAnnouncements();
 
     final destLat = (_s.selectedPlace!['lat'] as num).toDouble();
     final destLng = (_s.selectedPlace!['lng'] as num).toDouble();
