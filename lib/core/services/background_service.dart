@@ -15,6 +15,7 @@ class BackgroundService {
   Future<void> start() async {
     try {
       await _methodChannel.invokeMethod('startService');
+      _startListening();
     } on PlatformException catch (e) {
       // ignore: avoid_print
       print('[BackgroundService] Error al iniciar: ${e.message}');
@@ -48,7 +49,13 @@ class BackgroundService {
 
   Stream<LocationData> get locationStream {
     _controller ??= StreamController<LocationData>.broadcast();
-    _locationSub ??= _eventChannel
+    return _controller!.stream;
+  }
+
+  void _startListening() {
+    if (_locationSub != null) return;
+    _controller ??= StreamController<LocationData>.broadcast();
+    _locationSub = _eventChannel
         .receiveBroadcastStream()
         .listen((dynamic data) {
           if (data is Map && _controller != null && !_controller!.isClosed) {
@@ -60,9 +67,8 @@ class BackgroundService {
             ));
           }
         }, onError: (dynamic error) {
-          print('[BackgroundService] Error en stream: $error');
+          debugPrint('[BackgroundService] Error en stream: $error');
         });
-    return _controller!.stream;
   }
 }
 
