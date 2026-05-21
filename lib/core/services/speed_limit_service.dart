@@ -11,21 +11,20 @@ class SpeedLimitService {
   double? _lastQueryLat;
   double? _lastQueryLng;
   DateTime? _lastQueryTime;
-
+  bool _isFetching = false;
   // ── Obtener límite de velocidad ──────────────────────
 
   /// Retorna el límite de velocidad en km/h de la vía más cercana
   /// Retorna null si no hay datos disponibles
   Future<int?> getSpeedLimit(double lat, double lng) async {
-    // Evitar consultas repetidas — solo consultar si:
-    // - Han pasado más de 30 segundos desde la última consulta
-    // - O el usuario se movió más de 100 metros
+    if (_isFetching) return _lastSpeedLimit;
     if (_lastQueryTime != null && _lastQueryLat != null) {
       final elapsed = DateTime.now().difference(_lastQueryTime!).inSeconds;
       final moved   = _distanceBetween(lat, lng, _lastQueryLat!, _lastQueryLng!);
       if (elapsed < 30 && moved < 100) return _lastSpeedLimit;
     }
 
+    _isFetching = true;
     try {
       final query =
           '[out:json][timeout:10];'
@@ -75,6 +74,7 @@ class SpeedLimitService {
     _lastQueryLat   = null;
     _lastQueryLng   = null;
     _lastQueryTime  = null;
+    _isFetching     = false;
   }
 
   // ── Helpers ──────────────────────────────────────────
